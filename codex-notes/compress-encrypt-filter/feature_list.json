@@ -4,7 +4,7 @@
       "id": "scaffold-rust-cli",
       "description": "Create Cargo project structure and define the git-zcrypt CLI with all planned subcommands stubbed.",
       "validation": "cargo test; subcommands are accepted by the parser and return controlled stub errors until implemented",
-      "passes": false
+      "passes": true
     },
     {
       "id": "local-key-store",
