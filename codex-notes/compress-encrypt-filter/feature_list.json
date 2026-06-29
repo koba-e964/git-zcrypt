@@ -28,7 +28,7 @@
       "id": "blob-format",
       "description": "Implement strict encode/decode for the GZC1 versioned encrypted blob format.",
       "validation": "cargo test blob; malformed magic, version, lengths, and reserved fields are rejected",
-      "passes": false
+      "passes": true
     },
     {
       "id": "crypto",

@@ -6,11 +6,11 @@ license = "MIT OR Apache-2.0"
 description = "Git clean/smudge filter that compresses and encrypts file contents"
 
 [dependencies]
-anyhow = "1.0.100"
-clap = { version = "4.5.51", features = ["derive"] }
-flate2 = "1.1.5"
-getrandom = "0.4.3"
-zeroize = "1.8.2"
+anyhow = { version = "1.0.100", default-features = false, features = ["std"] }
+clap = { version = "4.5.51", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
+flate2 = { version = "1.1.5", default-features = false, features = ["rust_backend"] }
+getrandom = { version = "0.4.3", default-features = false, features = ["std"] }
+zeroize = { version = "1.8.2", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
-tempfile = "3.23.0"
+tempfile = { version = "3.23.0", default-features = false, features = ["getrandom"] }

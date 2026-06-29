@@ -2,6 +2,7 @@ use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod blob;
 mod compression;
 mod key_store;
 
