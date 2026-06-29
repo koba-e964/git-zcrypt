@@ -20,6 +20,7 @@ impl KeyStore {
         })
     }
 
+    #[cfg(test)]
     pub fn discover_from(cwd: &Path) -> Result<Self> {
         let git_dir = git_dir(Some(cwd))?;
         Ok(Self {
@@ -37,6 +38,7 @@ impl KeyStore {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn root(&self) -> &Path {
         &self.root
     }

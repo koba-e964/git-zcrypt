@@ -40,7 +40,7 @@
       "id": "clean-smudge",
       "description": "Implement binary stdin/stdout clean and smudge filters that compose compression, blob format, and encryption.",
       "validation": "cargo test --test filter_roundtrip; arbitrary binary bytes and empty input round trip",
-      "passes": false
+      "passes": true
     },
     {
       "id": "git-config",

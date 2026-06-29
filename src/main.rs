@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 
 mod blob;
@@ -81,13 +82,46 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::InstallFilter { .. } => stub("install-filter"),
         Command::Status => stub("status"),
-        Command::Clean { .. } => stub("clean"),
-        Command::Smudge => stub("smudge"),
+        Command::Clean { key } => clean(&key),
+        Command::Smudge => smudge(),
     }
 }
 
 fn stub(command: &str) -> Result<()> {
     bail!("{command} is not implemented yet")
+}
+
+fn clean(key_id: &str) -> Result<()> {
+    let store = key_store::KeyStore::discover()?;
+    let key = store.read_key(key_id)?;
+    let input = read_stdin()?;
+    let compressed = compression::compress(&input)?;
+    let encrypted = crypto::encrypt(&key, key_id, &compressed)?;
+    let encoded = blob::encode(&encrypted.key_id, &encrypted.nonce, &encrypted.ciphertext)?;
+    write_stdout(&encoded)
+}
+
+fn smudge() -> Result<()> {
+    let store = key_store::KeyStore::discover()?;
+    let input = read_stdin()?;
+    let encrypted = blob::decode(&input)?;
+    let key = store.read_key(&encrypted.key_id)?;
+    let compressed = crypto::decrypt(&key, &encrypted)?;
+    let plaintext = compression::decompress(&compressed)?;
+    write_stdout(&plaintext)
+}
+
+fn read_stdin() -> Result<Vec<u8>> {
+    let mut input = Vec::new();
+    io::stdin().lock().read_to_end(&mut input)?;
+    Ok(input)
+}
+
+fn write_stdout(bytes: &[u8]) -> Result<()> {
+    let mut stdout = io::stdout().lock();
+    stdout.write_all(bytes)?;
+    stdout.flush()?;
+    Ok(())
 }
 
 #[cfg(test)]
