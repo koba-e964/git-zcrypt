@@ -1,0 +1,64 @@
+{
+  "features": [
+    {
+      "id": "scaffold-rust-cli",
+      "description": "Create Cargo project structure and define the git-zcrypt CLI with all planned subcommands stubbed.",
+      "validation": "cargo test; subcommands are accepted by the parser and return controlled stub errors until implemented",
+      "passes": false
+    },
+    {
+      "id": "local-key-store",
+      "description": "Implement .git/git-zcrypt key-store discovery, key-name validation, and init directory creation.",
+      "validation": "cargo test key_store; init creates .git/git-zcrypt/keys in a temporary git repository",
+      "passes": false
+    },
+    {
+      "id": "raw-key-commands",
+      "description": "Implement generate-key, import-key, and export-key for exactly 32-byte raw keys.",
+      "validation": "cargo test key_store; invalid key lengths fail and exported generated keys are 32 bytes",
+      "passes": false
+    },
+    {
+      "id": "compression",
+      "description": "Implement deterministic zlib/deflate compression and decompression helpers for arbitrary bytes.",
+      "validation": "cargo test compression; empty and binary inputs round trip",
+      "passes": false
+    },
+    {
+      "id": "blob-format",
+      "description": "Implement strict encode/decode for the GZC1 versioned encrypted blob format.",
+      "validation": "cargo test blob; malformed magic, version, lengths, and reserved fields are rejected",
+      "passes": false
+    },
+    {
+      "id": "crypto",
+      "description": "Implement ChaCha20-Poly1305 encryption/decryption with OS-backed random 96-bit nonces and authenticated metadata.",
+      "validation": "cargo test crypto; tampered ciphertext or metadata fails to decrypt",
+      "passes": false
+    },
+    {
+      "id": "clean-smudge",
+      "description": "Implement binary stdin/stdout clean and smudge filters that compose compression, blob format, and encryption.",
+      "validation": "cargo test --test filter_roundtrip; arbitrary binary bytes and empty input round trip",
+      "passes": false
+    },
+    {
+      "id": "git-config",
+      "description": "Implement install-filter and status using local Git configuration for filter.git-zcrypt.",
+      "validation": "cargo test git_config; temporary repository config contains clean, smudge, and required settings",
+      "passes": false
+    },
+    {
+      "id": "documentation",
+      "description": "Add README setup instructions, .gitattributes examples, and key safety warnings.",
+      "validation": "README includes init, key generation/import/export, install-filter, .gitattributes, backup, and history warnings",
+      "passes": false
+    },
+    {
+      "id": "end-to-end-validation",
+      "description": "Run formatting, tests, and a manual temporary-repository smoke test for the Git filter flow.",
+      "validation": "cargo fmt; cargo test; manual git clean/smudge smoke test succeeds",
+      "passes": false
+    }
+  ]
+}

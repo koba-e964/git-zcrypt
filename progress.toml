@@ -1,0 +1,5 @@
+[[items]]
+id = "password-kdf-design"
+description = "Design and implement password/passphrase-derived key support with approved KDF parameters, salt storage, migration behavior, and secret-handling rules."
+validation = "test -f codex-notes/password-kdf-design/plan.md && rg -q 'Argon2id|KDF|password' codex-notes/password-kdf-design/plan.md"
+passes = false
