@@ -58,7 +58,7 @@
       "id": "end-to-end-validation",
       "description": "Run formatting, tests, and a manual temporary-repository smoke test for the Git filter flow.",
       "validation": "cargo fmt; cargo test; manual git clean/smudge smoke test succeeds",
-      "passes": false
+      "passes": true
     }
   ]
 }
