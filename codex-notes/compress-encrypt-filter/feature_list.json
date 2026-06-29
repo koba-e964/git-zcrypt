@@ -52,7 +52,7 @@
       "id": "documentation",
       "description": "Add README setup instructions, .gitattributes examples, and key safety warnings.",
       "validation": "README includes init, key generation/import/export, install-filter, .gitattributes, backup, and history warnings",
-      "passes": false
+      "passes": true
     },
     {
       "id": "end-to-end-validation",
