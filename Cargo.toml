@@ -8,6 +8,8 @@ description = "Git clean/smudge filter that compresses and encrypts file content
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["derive"] }
+getrandom = "0.4.3"
+zeroize = "1.8.2"
 
 [dev-dependencies]
 tempfile = "3.23.0"

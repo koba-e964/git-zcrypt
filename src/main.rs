@@ -64,9 +64,18 @@ fn run(cli: Cli) -> Result<()> {
             let store = key_store::KeyStore::discover()?;
             store.init()
         }
-        Command::GenerateKey { .. } => stub("generate-key"),
-        Command::ImportKey { .. } => stub("import-key"),
-        Command::ExportKey { .. } => stub("export-key"),
+        Command::GenerateKey { name } => {
+            let store = key_store::KeyStore::discover()?;
+            store.generate_key(&name)
+        }
+        Command::ImportKey { name, input } => {
+            let store = key_store::KeyStore::discover()?;
+            store.import_key(&name, &input)
+        }
+        Command::ExportKey { name, output } => {
+            let store = key_store::KeyStore::discover()?;
+            store.export_key(&name, &output)
+        }
         Command::InstallFilter { .. } => stub("install-filter"),
         Command::Status => stub("status"),
         Command::Clean { .. } => stub("clean"),

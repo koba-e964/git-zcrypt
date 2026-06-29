@@ -16,7 +16,7 @@
       "id": "raw-key-commands",
       "description": "Implement generate-key, import-key, and export-key for exactly 32-byte raw keys.",
       "validation": "cargo test key_store; invalid key lengths fail and exported generated keys are 32 bytes",
-      "passes": false
+      "passes": true
     },
     {
       "id": "compression",

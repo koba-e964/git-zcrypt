@@ -1,7 +1,11 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use zeroize::{Zeroize, Zeroizing};
+
+pub const RAW_KEY_LEN: usize = 32;
 
 #[derive(Debug, Clone)]
 pub struct KeyStore {
@@ -10,7 +14,14 @@ pub struct KeyStore {
 
 impl KeyStore {
     pub fn discover() -> Result<Self> {
-        let git_dir = git_dir()?;
+        let git_dir = git_dir(None)?;
+        Ok(Self {
+            root: git_dir.join("git-zcrypt"),
+        })
+    }
+
+    pub fn discover_from(cwd: &Path) -> Result<Self> {
+        let git_dir = git_dir(Some(cwd))?;
         Ok(Self {
             root: git_dir.join("git-zcrypt"),
         })
@@ -38,6 +49,58 @@ impl KeyStore {
         validate_key_name(name)?;
         Ok(self.keys_dir().join(format!("{name}.key")))
     }
+
+    pub fn generate_key(&self, name: &str) -> Result<()> {
+        let mut key = [0_u8; RAW_KEY_LEN];
+        getrandom::fill(&mut key).context("failed to generate key material")?;
+        let result = self.write_key(name, &key);
+        key.zeroize();
+        result
+    }
+
+    pub fn import_key(&self, name: &str, input: &Path) -> Result<()> {
+        let bytes = Zeroizing::new(
+            fs::read(input)
+                .with_context(|| format!("failed to read key from {}", input.display()))?,
+        );
+        ensure!(
+            bytes.len() == RAW_KEY_LEN,
+            "raw key must be exactly {RAW_KEY_LEN} bytes, got {} bytes",
+            bytes.len()
+        );
+
+        let mut key = [0_u8; RAW_KEY_LEN];
+        key.copy_from_slice(&bytes);
+        let result = self.write_key(name, &key);
+        key.zeroize();
+        result
+    }
+
+    pub fn export_key(&self, name: &str, output: &Path) -> Result<()> {
+        let key = self.read_key(name)?;
+        write_secret_file(output, &key)
+            .with_context(|| format!("failed to export key to {}", output.display()))
+    }
+
+    pub fn read_key(&self, name: &str) -> Result<Zeroizing<Vec<u8>>> {
+        let path = self.key_path(name)?;
+        let bytes = Zeroizing::new(
+            fs::read(&path).with_context(|| format!("failed to read key {}", path.display()))?,
+        );
+        ensure!(
+            bytes.len() == RAW_KEY_LEN,
+            "stored key {name} must be exactly {RAW_KEY_LEN} bytes, got {} bytes",
+            bytes.len()
+        );
+        Ok(bytes)
+    }
+
+    fn write_key(&self, name: &str, key: &[u8; RAW_KEY_LEN]) -> Result<()> {
+        self.init()?;
+        let path = self.key_path(name)?;
+        write_secret_file(&path, key)
+            .with_context(|| format!("failed to write key {}", path.display()))
+    }
 }
 
 pub fn validate_key_name(name: &str) -> Result<()> {
@@ -55,11 +118,13 @@ pub fn validate_key_name(name: &str) -> Result<()> {
     }
 }
 
-fn git_dir() -> Result<PathBuf> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--absolute-git-dir"])
-        .output()
-        .context("failed to locate Git directory")?;
+fn git_dir(cwd: Option<&Path>) -> Result<PathBuf> {
+    let mut command = Command::new("git");
+    command.args(["rev-parse", "--absolute-git-dir"]);
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    let output = command.output().context("failed to locate Git directory")?;
 
     if !output.status.success() {
         return Err(anyhow!(
@@ -77,9 +142,38 @@ fn git_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(path))
 }
 
+#[cfg(unix)]
+fn write_secret_file(path: &Path, bytes: &[u8]) -> Result<()> {
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn write_secret_file(path: &Path, bytes: &[u8]) -> Result<()> {
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{KeyStore, validate_key_name};
+    use std::fs;
     use std::process::Command;
     use tempfile::TempDir;
 
@@ -104,18 +198,49 @@ mod tests {
             .expect("git init");
         assert!(status.success());
 
-        let original_dir = std::env::current_dir().expect("current dir");
-        std::env::set_current_dir(temp.path()).expect("chdir temp repo");
         let result = (|| {
-            let store = KeyStore::discover()?;
+            let store = KeyStore::discover_from(temp.path())?;
             store.init()?;
             assert!(store.root().ends_with(".git/git-zcrypt"));
             assert!(store.keys_dir().is_dir());
             assert!(store.key_path("default")?.ends_with("keys/default.key"));
             Ok::<_, anyhow::Error>(())
         })();
-        std::env::set_current_dir(original_dir).expect("restore cwd");
 
         result.expect("key store init");
+    }
+
+    #[test]
+    fn generate_import_and_export_require_raw_32_byte_keys() {
+        let temp = TempDir::new().expect("tempdir");
+        let status = Command::new("git")
+            .arg("init")
+            .current_dir(temp.path())
+            .status()
+            .expect("git init");
+        assert!(status.success());
+
+        let result = (|| {
+            let store = KeyStore::discover_from(temp.path())?;
+            store.generate_key("generated")?;
+            assert_eq!(fs::read(store.key_path("generated")?)?.len(), 32);
+
+            let invalid = temp.path().join("invalid.key");
+            fs::write(&invalid, [7_u8; 31])?;
+            store
+                .import_key("invalid", &invalid)
+                .expect_err("invalid key length");
+
+            let imported = temp.path().join("imported.key");
+            fs::write(&imported, [9_u8; 32])?;
+            store.import_key("imported", &imported)?;
+
+            let exported = temp.path().join("exported.key");
+            store.export_key("imported", &exported)?;
+            assert_eq!(fs::read(exported)?, [9_u8; 32]);
+            Ok::<_, anyhow::Error>(())
+        })();
+
+        result.expect("raw key commands");
     }
 }
