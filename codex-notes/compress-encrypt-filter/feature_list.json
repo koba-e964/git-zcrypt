@@ -34,7 +34,7 @@
       "id": "crypto",
       "description": "Implement ChaCha20-Poly1305 encryption/decryption with OS-backed random 96-bit nonces and authenticated metadata.",
       "validation": "cargo test crypto; tampered ciphertext or metadata fails to decrypt",
-      "passes": false
+      "passes": true
     },
     {
       "id": "clean-smudge",

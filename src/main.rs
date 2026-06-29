@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 mod blob;
 mod compression;
+mod crypto;
 mod key_store;
 
 #[derive(Debug, Parser)]
