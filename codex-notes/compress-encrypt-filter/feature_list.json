@@ -10,7 +10,7 @@
       "id": "local-key-store",
       "description": "Implement .git/git-zcrypt key-store discovery, key-name validation, and init directory creation.",
       "validation": "cargo test key_store; init creates .git/git-zcrypt/keys in a temporary git repository",
-      "passes": false
+      "passes": true
     },
     {
       "id": "raw-key-commands",

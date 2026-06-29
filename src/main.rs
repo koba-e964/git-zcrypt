@@ -2,6 +2,8 @@ use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod key_store;
+
 #[derive(Debug, Parser)]
 #[command(name = "git-zcrypt")]
 #[command(about = "Compressing and encrypting Git clean/smudge filter")]
@@ -58,7 +60,10 @@ fn main() {
 
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Init => stub("init"),
+        Command::Init => {
+            let store = key_store::KeyStore::discover()?;
+            store.init()
+        }
         Command::GenerateKey { .. } => stub("generate-key"),
         Command::ImportKey { .. } => stub("import-key"),
         Command::ExportKey { .. } => stub("export-key"),
