@@ -22,7 +22,7 @@
       "id": "compression",
       "description": "Implement deterministic zlib/deflate compression and decompression helpers for arbitrary bytes.",
       "validation": "cargo test compression; empty and binary inputs round trip",
-      "passes": false
+      "passes": true
     },
     {
       "id": "blob-format",
