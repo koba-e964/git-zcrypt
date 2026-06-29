@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
@@ -6,6 +6,7 @@ use std::path::PathBuf;
 mod blob;
 mod compression;
 mod crypto;
+mod git_config;
 mod key_store;
 
 #[derive(Debug, Parser)]
@@ -80,15 +81,11 @@ fn run(cli: Cli) -> Result<()> {
             let store = key_store::KeyStore::discover()?;
             store.export_key(&name, &output)
         }
-        Command::InstallFilter { .. } => stub("install-filter"),
-        Command::Status => stub("status"),
+        Command::InstallFilter { name } => git_config::install_filter(&name),
+        Command::Status => git_config::print_status(),
         Command::Clean { key } => clean(&key),
         Command::Smudge => smudge(),
     }
-}
-
-fn stub(command: &str) -> Result<()> {
-    bail!("{command} is not implemented yet")
 }
 
 fn clean(key_id: &str) -> Result<()> {

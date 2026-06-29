@@ -46,7 +46,7 @@
       "id": "git-config",
       "description": "Implement install-filter and status using local Git configuration for filter.git-zcrypt.",
       "validation": "cargo test git_config; temporary repository config contains clean, smudge, and required settings",
-      "passes": false
+      "passes": true
     },
     {
       "id": "documentation",

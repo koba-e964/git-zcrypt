@@ -38,7 +38,6 @@ impl KeyStore {
         Ok(())
     }
 
-    #[cfg(test)]
     pub fn root(&self) -> &Path {
         &self.root
     }
@@ -50,6 +49,29 @@ impl KeyStore {
     pub fn key_path(&self, name: &str) -> Result<PathBuf> {
         validate_key_name(name)?;
         Ok(self.keys_dir().join(format!("{name}.key")))
+    }
+
+    pub fn key_names(&self) -> Result<Vec<String>> {
+        let keys_dir = self.keys_dir();
+        if !keys_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut names = Vec::new();
+        for entry in fs::read_dir(&keys_dir)
+            .with_context(|| format!("failed to list key directory {}", keys_dir.display()))?
+        {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("key") {
+                continue;
+            }
+            if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+                names.push(stem.to_owned());
+            }
+        }
+        names.sort();
+        Ok(names)
     }
 
     pub fn generate_key(&self, name: &str) -> Result<()> {
