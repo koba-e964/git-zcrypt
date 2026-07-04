@@ -139,8 +139,8 @@ Rationale:
 
 5. Add password-derived setup.
    - Add a CLI command named `derive-key`.
-   - `git-zcrypt derive-key --name <alias>` reads a hidden passphrase twice from the terminal and errors if confirmation differs.
-   - `git-zcrypt derive-key --name <alias> --stdin` reads the passphrase from stdin until EOF with no confirmation.
+   - `git-zcrypt derive-key --key <alias>` reads a hidden passphrase twice from the terminal and errors if confirmation differs.
+   - `git-zcrypt derive-key --key <alias> --stdin` reads the passphrase from stdin until EOF with no confirmation.
    - Do not add command-line passphrase arguments.
    - Derive a 32-byte raw key using the fixed Argon2id parameters, write it through the same registration path as generated/imported raw keys, then zeroize temporary password and key buffers.
 
@@ -205,7 +205,7 @@ Rationale:
   - `cargo test --test filter_roundtrip raw_key_round_trip_uses_hash_prefixed_key_id -- --exact`
   - `cargo test --test filter_roundtrip password_derived_key_round_trips_from_stdin_setup -- --exact`
 - Manual prompt smoke test after implementation:
-  - `git-zcrypt derive-key --name default` in a test repo, entering matching hidden passphrases.
+  - `git-zcrypt derive-key --key default` in a test repo, entering matching hidden passphrases.
 - Optional timing check:
   - Add or run a temporary local benchmark with the final parameters to confirm setup-time derivation remains interactive.
 

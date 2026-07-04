@@ -6,7 +6,7 @@ use chacha20poly1305::{ChaCha20Poly1305, Nonce};
 
 pub fn encrypt(key: &[u8], key_id: &str, plaintext: &[u8]) -> Result<Blob> {
     ensure_key_len(key)?;
-    key_store::validate_key_name(key_id)?;
+    key_store::validate_key_id(key_id)?;
 
     let mut nonce_bytes = [0_u8; NONCE_LEN];
     getrandom::fill(&mut nonce_bytes).context("failed to generate encryption nonce")?;
@@ -64,11 +64,13 @@ fn ensure_key_len(key: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{decrypt, encrypt};
+    use crate::key_store::key_id_for_key;
 
     #[test]
     fn encrypt_decrypt_round_trips() {
         let key = [7_u8; 32];
-        let blob = encrypt(&key, "default", b"plaintext").expect("encrypt");
+        let key_id = key_id_for_key(&key);
+        let blob = encrypt(&key, &key_id, b"plaintext").expect("encrypt");
         let plaintext = decrypt(&key, &blob).expect("decrypt");
         assert_eq!(plaintext, b"plaintext");
     }
@@ -76,8 +78,9 @@ mod tests {
     #[test]
     fn fresh_nonce_changes_ciphertext() {
         let key = [7_u8; 32];
-        let first = encrypt(&key, "default", b"plaintext").expect("encrypt first");
-        let second = encrypt(&key, "default", b"plaintext").expect("encrypt second");
+        let key_id = key_id_for_key(&key);
+        let first = encrypt(&key, &key_id, b"plaintext").expect("encrypt first");
+        let second = encrypt(&key, &key_id, b"plaintext").expect("encrypt second");
         assert_ne!(first.nonce, second.nonce);
         assert_ne!(first.ciphertext, second.ciphertext);
     }
@@ -85,19 +88,23 @@ mod tests {
     #[test]
     fn tampered_ciphertext_or_metadata_fails() {
         let key = [7_u8; 32];
-        let blob = encrypt(&key, "default", b"plaintext").expect("encrypt");
+        let key_id = key_id_for_key(&key);
+        let blob = encrypt(&key, &key_id, b"plaintext").expect("encrypt");
 
         let mut tampered_ciphertext = blob.clone();
         tampered_ciphertext.ciphertext[0] ^= 1;
         decrypt(&key, &tampered_ciphertext).expect_err("tampered ciphertext");
 
         let mut tampered_metadata = blob;
-        tampered_metadata.key_id = "other".to_owned();
+        tampered_metadata.key_id =
+            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
         decrypt(&key, &tampered_metadata).expect_err("tampered metadata");
     }
 
     #[test]
     fn rejects_wrong_key_length() {
-        encrypt(&[0_u8; 31], "default", b"plaintext").expect_err("short key");
+        let key = [7_u8; 32];
+        let key_id = key_id_for_key(&key);
+        encrypt(&[0_u8; 31], &key_id, b"plaintext").expect_err("short key");
     }
 }

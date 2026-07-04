@@ -1,5 +1,11 @@
 [[items]]
 id = "password-kdf-design"
 description = "Design and implement password/passphrase-derived key support with approved KDF parameters, salt storage, migration behavior, and secret-handling rules."
-validation = "cargo test -- --list | rg -q '^key_store::tests::key_id_for_key_uses_sha256_prefix: test$' && cargo test key_store::tests::key_id_for_key_uses_sha256_prefix -- --exact && cargo test --test filter_roundtrip -- --list | rg -q '^password_derived_key_round_trips_from_stdin_setup: test$' && cargo test --test filter_roundtrip password_derived_key_round_trips_from_stdin_setup -- --exact && rg -q 'derive-key|sha256:' README.md && rg -q 'Argon2id|derive-key|sha256:|constrained JSON' codex-notes/password-kdf-design/plan.md"
-passes = false
+validation = "cargo test -- --list > /tmp/git-zcrypt-unit-tests.txt && (rg -q '^key_store::tests::key_id_for_key_uses_sha256_prefix: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: key_store::tests::key_id_for_key_uses_sha256_prefix' >&2; exit 1)) && cargo test key_store::tests::key_id_for_key_uses_sha256_prefix -- --exact && cargo test --test filter_roundtrip -- --list > /tmp/git-zcrypt-filter-tests.txt && (rg -q '^password_derived_key_round_trips_from_stdin_setup: test$' /tmp/git-zcrypt-filter-tests.txt || (echo 'missing test: password_derived_key_round_trips_from_stdin_setup' >&2; exit 1)) && cargo test --test filter_roundtrip password_derived_key_round_trips_from_stdin_setup -- --exact && rg -q 'derive-key|sha256:' README.md && rg -q 'Argon2id|derive-key|sha256:|constrained JSON' codex-notes/password-kdf-design/plan.md"
+passes = true
+
+[[items]]
+id = "option-name-inconsistency"
+description = "keys should be given via --key option, regardless of the command"
+validation = "cargo test -- --list > /tmp/git-zcrypt-unit-tests.txt && (rg -q '^tests::parses_key_option_for_key_commands: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: tests::parses_key_option_for_key_commands' >&2; exit 1)) && cargo test tests::parses_key_option_for_key_commands -- --exact && rg -q 'generate-key --key|derive-key --key|install-filter --key|import-key --key|export-key --key' README.md"
+passes = true

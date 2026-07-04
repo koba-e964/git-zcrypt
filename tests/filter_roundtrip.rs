@@ -23,10 +23,29 @@ fn init_repo() -> TempDir {
     assert!(status.success());
 
     let status = Command::new(git_zcrypt())
-        .args(["generate-key", "--name", "default"])
+        .args(["generate-key", "--key", "default"])
         .current_dir(temp.path())
         .status()
         .expect("git-zcrypt generate-key");
+    assert!(status.success());
+
+    temp
+}
+
+fn init_empty_repo() -> TempDir {
+    let temp = TempDir::new().expect("tempdir");
+    let status = Command::new("git")
+        .arg("init")
+        .current_dir(temp.path())
+        .status()
+        .expect("git init");
+    assert!(status.success());
+
+    let status = Command::new(git_zcrypt())
+        .arg("init")
+        .current_dir(temp.path())
+        .status()
+        .expect("git-zcrypt init");
     assert!(status.success());
 
     temp
@@ -52,8 +71,14 @@ fn filter(repo: &TempDir, args: &[&str], input: &[u8]) -> std::process::Output {
     child.wait_with_output().expect("wait git-zcrypt")
 }
 
+fn key_id_from_blob(blob: &[u8]) -> &str {
+    let key_id_start = 12;
+    let key_id_len = blob[9] as usize;
+    std::str::from_utf8(&blob[key_id_start..key_id_start + key_id_len]).expect("key id utf8")
+}
+
 #[test]
-fn binary_bytes_round_trip() {
+fn raw_key_round_trip_uses_hash_prefixed_key_id() {
     let repo = init_repo();
     let input: Vec<u8> = (0_u8..=255).chain([0, 255, 10, 13, 42]).collect();
 
@@ -64,6 +89,7 @@ fn binary_bytes_round_trip() {
         String::from_utf8_lossy(&clean.stderr)
     );
     assert_ne!(clean.stdout, input);
+    assert!(key_id_from_blob(&clean.stdout).starts_with("sha256:"));
 
     let smudge = filter(&repo, &["smudge"], &clean.stdout);
     assert!(
@@ -72,6 +98,60 @@ fn binary_bytes_round_trip() {
         String::from_utf8_lossy(&smudge.stderr)
     );
     assert_eq!(smudge.stdout, input);
+}
+
+#[test]
+fn password_derived_key_round_trips_from_stdin_setup() {
+    let repo = init_empty_repo();
+    let derive = filter(
+        &repo,
+        &["derive-key", "--key", "password", "--stdin"],
+        b"correct horse battery staple\n",
+    );
+    assert!(
+        derive.status.success(),
+        "{}",
+        String::from_utf8_lossy(&derive.stderr)
+    );
+
+    let clean = filter(&repo, &["clean", "--key", "password"], b"password secret");
+    assert!(
+        clean.status.success(),
+        "{}",
+        String::from_utf8_lossy(&clean.stderr)
+    );
+    assert!(key_id_from_blob(&clean.stdout).starts_with("sha256:"));
+
+    let smudge = filter(&repo, &["smudge"], &clean.stdout);
+    assert!(
+        smudge.status.success(),
+        "{}",
+        String::from_utf8_lossy(&smudge.stderr)
+    );
+    assert_eq!(smudge.stdout, b"password secret");
+}
+
+#[test]
+fn duplicate_password_derived_key_fails() {
+    let repo = init_empty_repo();
+    let first = filter(
+        &repo,
+        &["derive-key", "--key", "first", "--stdin"],
+        b"same password\n",
+    );
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+
+    let duplicate = filter(
+        &repo,
+        &["derive-key", "--key", "second", "--stdin"],
+        b"same password\n",
+    );
+    assert!(!duplicate.status.success());
+    assert!(String::from_utf8_lossy(&duplicate.stderr).contains("already registered"));
 }
 
 #[test]

@@ -3,9 +3,10 @@
 `git-zcrypt` is a Git clean/smudge filter that compresses file bytes with zlib
 and encrypts them with ChaCha20-Poly1305 before Git stores them.
 
-This first version uses raw 32-byte symmetric keys stored locally under
-`.git/git-zcrypt/`. Password-derived keys are intentionally out of scope until a
-separate KDF design is approved.
+Keys are stored locally under `.git/git-zcrypt/`. Raw 32-byte keys can be
+generated or imported directly, and password-derived keys can be created with
+Argon2id. Encrypted blobs store a hash-prefixed key id such as `sha256:...`;
+local aliases map to those ids through `.git/git-zcrypt/index.json`.
 
 ## Install
 
@@ -33,13 +34,26 @@ git-zcrypt init
 Generate a new raw key:
 
 ```sh
-git-zcrypt generate-key --name default
+git-zcrypt generate-key --key default
+```
+
+Or derive a key from a password:
+
+```sh
+git-zcrypt derive-key --key default
+```
+
+For scripted setup, pass the password on stdin. One trailing LF or CRLF is
+trimmed before derivation:
+
+```sh
+printf '%s\n' "$GIT_ZCRYPT_PASSWORD" | git-zcrypt derive-key --key default --stdin
 ```
 
 Install the local Git filter config:
 
 ```sh
-git-zcrypt install-filter --name default
+git-zcrypt install-filter --key default
 ```
 
 Add a `.gitattributes` rule before adding sensitive files:
@@ -59,18 +73,20 @@ git-zcrypt status
 Import an existing 32-byte raw key:
 
 ```sh
-git-zcrypt import-key --name default --input default.key
+git-zcrypt import-key --key default --input default.key
 ```
 
 Export a local key for backup or transfer:
 
 ```sh
-git-zcrypt export-key --name default --output default.key
+git-zcrypt export-key --key default --output default.key
 ```
 
-Key files are not committed by `git-zcrypt`; they live under `.git/git-zcrypt/`.
-Back them up and transfer them securely. Losing the key makes encrypted blobs
-unrecoverable.
+Key files and `index.json` are not committed by `git-zcrypt`; they live under
+`.git/git-zcrypt/`. Exported keys are raw 32-byte keys. Password-derived keys do
+not store KDF metadata; the fixed Argon2id parameters make the same password
+produce the same key id. Back keys up and transfer them securely. Losing the key
+makes encrypted blobs unrecoverable.
 
 ## Safety Notes
 
