@@ -31,8 +31,8 @@ passes = true
 [[items]]
 id = "avoid-clap"
 description = "clap is too heavy a crate (in size). use lighter one"
-validation = "false"
-passes = false
+validation = "cargo test -- --list > /tmp/git-zcrypt-unit-tests.txt && (rg -q '^cli::tests::parses_planned_subcommands: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: cli::tests::parses_planned_subcommands' >&2; exit 1)) && cargo test cli::tests::parses_planned_subcommands -- --exact && (rg -q '^cli::tests::parses_key_option_for_key_commands: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: cli::tests::parses_key_option_for_key_commands' >&2; exit 1)) && cargo test cli::tests::parses_key_option_for_key_commands -- --exact && (rg -q '^cli::tests::parser_rejects_missing_and_unexpected_options: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: cli::tests::parser_rejects_missing_and_unexpected_options' >&2; exit 1)) && cargo test cli::tests::parser_rejects_missing_and_unexpected_options -- --exact && ! rg -q 'clap =' Cargo.toml && ! rg -q '^name = \"clap' Cargo.lock && ! rg -q 'use clap|Parser|Subcommand' src/main.rs src/cli.rs"
+passes = true
 
 [[items]]
 id = "auto-check-executable-sizes"

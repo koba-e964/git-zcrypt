@@ -9,7 +9,6 @@ description = "Git clean/smudge filter that compresses and encrypts file content
 anyhow = { version = "1.0.100", default-features = false, features = ["std"] }
 argon2 = { version = "0.5.3", default-features = false, features = ["alloc", "zeroize"] }
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc", "zeroize"] }
-clap = { version = "4.5.51", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
 flate2 = { version = "1.1.5", default-features = false, features = ["rust_backend"] }
 getrandom = { version = "0.4.3", default-features = false, features = ["std"] }
 rpassword = { version = "7.5.4", default-features = false }
