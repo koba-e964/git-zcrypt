@@ -1,5 +1,5 @@
 [[items]]
 id = "password-kdf-design"
 description = "Design and implement password/passphrase-derived key support with approved KDF parameters, salt storage, migration behavior, and secret-handling rules."
-validation = "test -f codex-notes/password-kdf-design/plan.md && rg -q 'Argon2id|KDF|password' codex-notes/password-kdf-design/plan.md"
+validation = "cargo test -- --list | rg -q '^key_store::tests::key_id_for_key_uses_sha256_prefix: test$' && cargo test key_store::tests::key_id_for_key_uses_sha256_prefix -- --exact && cargo test --test filter_roundtrip -- --list | rg -q '^password_derived_key_round_trips_from_stdin_setup: test$' && cargo test --test filter_roundtrip password_derived_key_round_trips_from_stdin_setup -- --exact && rg -q 'derive-key|sha256:' README.md && rg -q 'Argon2id|derive-key|sha256:|constrained JSON' codex-notes/password-kdf-design/plan.md"
 passes = false

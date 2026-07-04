@@ -19,12 +19,10 @@ These dependency choices are part of the plan and require approval before implem
   - Used for hidden terminal passphrase prompts.
 - `sha2 = { version = "0.11.0", default-features = false }`
   - Used for `sha256:<hex>` key ids derived from raw key material.
-- `serde = { version = "1.0.228", default-features = false, features = ["std"] }`
-  - Used by JSON index serialization.
-- `serde_json = { version = "1.0.150", default-features = false, features = ["std"] }`
-  - Used for `.git/git-zcrypt/index.json`.
 
-No separate hex crate is planned. Hex encoding is small enough to implement locally with a fixed lowercase alphabet.
+No separate hex or JSON crate is planned. Hex encoding is small enough to implement locally with a fixed lowercase alphabet. The index format is a constrained JSON object whose keys and values are strings, so implement a small local parser/formatter for that exact shape instead of pulling in `serde`/`serde_json`.
+
+`serde-lite` was considered as a smaller alternative to `serde`, but it does not by itself provide JSON file-format parsing/formatting; it is still a serialization framework layer. For this small index file, a constrained local JSON object reader/writer should be smaller and easier to audit.
 
 ## Argon2id Parameters
 
@@ -128,6 +126,7 @@ Rationale:
    - Path: `.git/git-zcrypt/index.json`.
    - Representation: `BTreeMap<String, String>` mapping key id to alias.
    - Read missing index as empty.
+   - Parse only a constrained JSON object with string keys and string values. Reject arrays, nested objects, non-string values, duplicate keys, invalid escapes, and trailing non-whitespace data.
    - Serialize pretty JSON with object keys sorted lexicographically by key-id string.
    - Write to a temp file in `.git/git-zcrypt/`, sync the temp file, rename into place, then best-effort sync the state directory on Unix if practical.
    - Keep `{` on the first formatted line by using object-shaped pretty JSON.
@@ -190,8 +189,21 @@ Rationale:
 
 ## Test Strategy
 
-- `cargo test`
-  - Unit tests and integration tests for key ids, index behavior, raw round trips, and password-derived stdin setup.
+- Use exact test names in validation commands and pre-check test discovery with `cargo test -- --list` or `cargo test --test <name> -- --list`.
+  - This avoids silent success when an expected test has not been added or was renamed.
+- Required exact unit tests:
+  - `cargo test key_store::tests::key_id_for_key_uses_sha256_prefix -- --exact`
+  - `cargo test key_store::tests::index_json_round_trips_sorted_key_ids -- --exact`
+  - `cargo test key_store::tests::index_json_rejects_invalid_shapes -- --exact`
+  - `cargo test key_store::tests::register_key_rejects_duplicate_key_material -- --exact`
+  - `cargo test kdf::tests::argon2id_derives_expected_32_byte_key -- --exact`
+  - `cargo test kdf::tests::derive_key_from_password_stdin_trims_single_trailing_newline -- --exact`
+  - `cargo test kdf::tests::hidden_prompt_confirmation_mismatch_fails -- --exact`
+  - `cargo test git_config::tests::status_lists_aliases_with_hash_prefixed_key_ids -- --exact`
+  - `cargo test git_config::tests::status_warns_on_key_index_mismatch -- --exact`
+- Required exact integration tests:
+  - `cargo test --test filter_roundtrip raw_key_round_trip_uses_hash_prefixed_key_id -- --exact`
+  - `cargo test --test filter_roundtrip password_derived_key_round_trips_from_stdin_setup -- --exact`
 - Manual prompt smoke test after implementation:
   - `git-zcrypt derive-key --name default` in a test repo, entering matching hidden passphrases.
 - Optional timing check:
@@ -203,7 +215,7 @@ Rationale:
 - `derive-key` is an acceptable command name for password-derived setup.
 - Rejecting existing aliases is acceptable for the first implementation because silent overwrite can corrupt the alias/index relationship.
 - Warnings should go to stderr.
-- `serde_json` pretty object output satisfies the first-line `{` requirement.
+- A local constrained JSON object parser/formatter is acceptable for `.git/git-zcrypt/index.json` to avoid the executable-size cost of `serde`/`serde_json`.
 
 ## Open Questions
 

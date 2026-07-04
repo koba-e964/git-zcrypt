@@ -2,44 +2,44 @@
   "features": [
     {
       "id": "add-kdf-dependencies",
-      "description": "Add approved Argon2id, hidden prompt, SHA-2, and JSON dependencies to Cargo.toml and refresh Cargo.lock",
-      "validation": "cargo check; verifies dependency resolution and compilation",
+      "description": "Add approved Argon2id, hidden prompt, and SHA-2 dependencies to Cargo.toml and refresh Cargo.lock",
+      "validation": "cargo test -- --list | rg -q '^kdf::tests::argon2id_derives_expected_32_byte_key: test$' && cargo test kdf::tests::argon2id_derives_expected_32_byte_key -- --exact",
       "passes": false
     },
     {
       "id": "add-key-id-index",
       "description": "Add sha256-prefixed key id helpers and .git/git-zcrypt/index.json read/write/update support in src/key_store.rs",
-      "validation": "cargo test key_store; covers key id formatting, sorted JSON index writes, and duplicate key rejection",
+      "validation": "cargo test -- --list | rg -q '^key_store::tests::key_id_for_key_uses_sha256_prefix: test$' && cargo test key_store::tests::key_id_for_key_uses_sha256_prefix -- --exact && cargo test -- --list | rg -q '^key_store::tests::index_json_round_trips_sorted_key_ids: test$' && cargo test key_store::tests::index_json_round_trips_sorted_key_ids -- --exact && cargo test -- --list | rg -q '^key_store::tests::index_json_rejects_invalid_shapes: test$' && cargo test key_store::tests::index_json_rejects_invalid_shapes -- --exact",
       "passes": false
     },
     {
       "id": "update-raw-key-registration",
       "description": "Update generate-key and import-key to register raw keys in index.json and reject duplicate key material",
-      "validation": "cargo test key_store; verifies generated/imported keys update index and duplicates fail",
+      "validation": "cargo test -- --list | rg -q '^key_store::tests::generate_import_and_export_require_raw_32_byte_keys: test$' && cargo test key_store::tests::generate_import_and_export_require_raw_32_byte_keys -- --exact && cargo test -- --list | rg -q '^key_store::tests::register_key_rejects_duplicate_key_material: test$' && cargo test key_store::tests::register_key_rejects_duplicate_key_material -- --exact",
       "passes": false
     },
     {
       "id": "add-password-derived-setup",
       "description": "Add derive-key setup command with hidden confirmation prompt and --stdin password input",
-      "validation": "cargo test derive_key; covers stdin derivation, confirmation mismatch handling, and zeroized temporary buffers where observable",
+      "validation": "cargo test -- --list | rg -q '^kdf::tests::derive_key_from_password_stdin_trims_single_trailing_newline: test$' && cargo test kdf::tests::derive_key_from_password_stdin_trims_single_trailing_newline -- --exact && cargo test -- --list | rg -q '^kdf::tests::hidden_prompt_confirmation_mismatch_fails: test$' && cargo test kdf::tests::hidden_prompt_confirmation_mismatch_fails -- --exact",
       "passes": false
     },
     {
       "id": "use-key-ids-in-filters",
       "description": "Update clean to write hash-prefixed blob key ids and smudge to resolve blob key ids through index.json",
-      "validation": "cargo test --test filter_roundtrip; verifies raw and password-derived keys round-trip through clean/smudge",
+      "validation": "cargo test --test filter_roundtrip -- --list | rg -q '^raw_key_round_trip_uses_hash_prefixed_key_id: test$' && cargo test --test filter_roundtrip raw_key_round_trip_uses_hash_prefixed_key_id -- --exact && cargo test --test filter_roundtrip -- --list | rg -q '^password_derived_key_round_trips_from_stdin_setup: test$' && cargo test --test filter_roundtrip password_derived_key_round_trips_from_stdin_setup -- --exact",
       "passes": false
     },
     {
       "id": "report-status-with-key-ids",
       "description": "Update status output to list aliases with hash-prefixed key ids and warn on key/index mismatches",
-      "validation": "cargo test git_config; verifies status formatting and warning behavior where locally testable",
+      "validation": "cargo test -- --list | rg -q '^git_config::tests::status_lists_aliases_with_hash_prefixed_key_ids: test$' && cargo test git_config::tests::status_lists_aliases_with_hash_prefixed_key_ids -- --exact && cargo test -- --list | rg -q '^git_config::tests::status_warns_on_key_index_mismatch: test$' && cargo test git_config::tests::status_warns_on_key_index_mismatch -- --exact",
       "passes": false
     },
     {
       "id": "update-password-docs",
       "description": "Update README.md and progress.toml for approved password-derived key behavior",
-      "validation": "cargo test && rg -q 'derive-key|sha256:' README.md && rg -q 'passes = true' progress.toml",
+      "validation": "cargo test --test filter_roundtrip -- --list | rg -q '^password_derived_key_round_trips_from_stdin_setup: test$' && cargo test --test filter_roundtrip password_derived_key_round_trips_from_stdin_setup -- --exact && rg -q 'derive-key|sha256:' README.md && test \"$(toml get progress.toml 'items' | jq '.[]|select(.id==\"password-kdf-design\").passes')\" = \"true\"",
       "passes": false
     }
   ]
