@@ -13,14 +13,20 @@ passes = true
 [[items]]
 id = "data-structure-doc"
 description = "for data structures this software handles (keys, encrypted files), formats should be documented"
-validation = "rg -q 'docs/data-formats\\.md' README.md && rg -q '^# Data Formats' docs/data-formats.md && rg -q '^## Encrypted Blob Format' docs/data-formats.md && rg -q 'magic: \"GZC1\\\\0\\\\0\\\\0\\\\0\"' docs/data-formats.md && rg -q 'version: 1' docs/data-formats.md && rg -q 'key_id_len' docs/data-formats.md && rg -q 'nonce_len: 12' docs/data-formats.md && rg -q 'reserved: 0' docs/data-formats.md && rg -q 'ChaCha20-Poly1305 ciphertext and tag' docs/data-formats.md && rg -q '^## Local Key Format' docs/data-formats.md && rg -q '\\.git/git-zcrypt/keys/<name>\\.key' docs/data-formats.md && rg -q 'size: 32 bytes' docs/data-formats.md && rg -q 'sha256:<64 lowercase hex chars>' docs/data-formats.md && rg -q 'constrained JSON object' docs/data-formats.md"
+validation = "rg -q 'docs/data-formats\\.md' README.md && rg -q '^# Data Formats' docs/data-formats.md && rg -q '^## Encrypted Blob Format' docs/data-formats.md && rg -q 'magic: \"GZC1\\\\0\\\\0\\\\0\\\\0\"' docs/data-formats.md && rg -q 'version: 1' docs/data-formats.md && rg -q 'key_id_len' docs/data-formats.md && rg -q 'nonce_len: 12' docs/data-formats.md && rg -q 'reserved: 0' docs/data-formats.md && rg -q 'ChaCha20-Poly1305 ciphertext and tag' docs/data-formats.md && rg -q '^## Local Key File Format' docs/data-formats.md && rg -q 'magic: \"GZCKEY\\\\0\\\\0\"' docs/data-formats.md && rg -q 'raw_key_len: 32' docs/data-formats.md && rg -q 'sha256:<64 lowercase hex chars>' docs/data-formats.md && rg -q 'constrained JSON object' docs/data-formats.md"
 passes = true
 
 [[items]]
 id = "versioning"
 description = "for data structures this software handles (keys, encrypted files), version should be present"
-validation = "false"
-passes = false
+validation = "cargo test -- --list > /tmp/git-zcrypt-unit-tests.txt && (rg -q '^blob::tests::rejects_malformed_headers: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: blob::tests::rejects_malformed_headers' >&2; exit 1)) && cargo test blob::tests::rejects_malformed_headers -- --exact && (rg -q '^key_store::tests::versioned_key_files_reject_malformed_headers: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: key_store::tests::versioned_key_files_reject_malformed_headers' >&2; exit 1)) && cargo test key_store::tests::versioned_key_files_reject_malformed_headers -- --exact && rg -q 'magic: \"GZC1\\\\0\\\\0\\\\0\\\\0\"' docs/data-formats.md && rg -q 'magic: \"GZCKEY\\\\0\\\\0\"' docs/data-formats.md && rg -q 'version: 1' docs/data-formats.md && rg -q 'raw_key_len: 32' docs/data-formats.md"
+passes = true
+
+[[items]]
+id = "delete-key"
+description = "keys can be deleted from local git-zcrypt state when they are no longer needed in a clone"
+validation = "cargo test -- --list > /tmp/git-zcrypt-unit-tests.txt && (rg -q '^tests::parses_key_option_for_key_commands: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: tests::parses_key_option_for_key_commands' >&2; exit 1)) && cargo test tests::parses_key_option_for_key_commands -- --exact && (rg -q '^key_store::tests::delete_key_removes_key_file_and_index_entry: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: key_store::tests::delete_key_removes_key_file_and_index_entry' >&2; exit 1)) && cargo test key_store::tests::delete_key_removes_key_file_and_index_entry -- --exact && cargo test --test filter_roundtrip -- --list > /tmp/git-zcrypt-filter-tests.txt && (rg -q '^delete_key_removes_local_key_material: test$' /tmp/git-zcrypt-filter-tests.txt || (echo 'missing test: delete_key_removes_local_key_material' >&2; exit 1)) && cargo test --test filter_roundtrip delete_key_removes_local_key_material -- --exact && rg -q 'delete-key --key' README.md"
+passes = true
 
 [[items]]
 id = "avoid-clap"

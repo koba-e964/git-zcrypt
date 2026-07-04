@@ -11,6 +11,9 @@ use zeroize::{Zeroize, Zeroizing};
 pub const RAW_KEY_LEN: usize = 32;
 const KEY_ID_PREFIX: &str = "sha256:";
 const INDEX_FILE: &str = "index.json";
+const KEY_FILE_MAGIC: [u8; 8] = *b"GZCKEY\0\0";
+const KEY_FILE_VERSION: u8 = 1;
+const KEY_FILE_HEADER_LEN: usize = 12;
 
 #[derive(Debug, Clone)]
 pub struct KeyStore {
@@ -165,6 +168,27 @@ impl KeyStore {
             .with_context(|| format!("failed to export key to {}", output.display()))
     }
 
+    pub fn delete_key(&self, name: &str) -> Result<()> {
+        let path = self.key_path(name)?;
+        let mut index = self.read_index()?;
+        let original_len = index.len();
+        index.retain(|_, indexed_name| indexed_name != name);
+        let was_indexed = index.len() != original_len;
+        let key_file_exists = path.exists();
+
+        ensure!(key_file_exists || was_indexed, "key {name} does not exist");
+
+        if was_indexed {
+            self.write_index(&index)?;
+        }
+        if key_file_exists {
+            fs::remove_file(&path)
+                .with_context(|| format!("failed to delete key {}", path.display()))?;
+            sync_dir(&self.keys_dir())?;
+        }
+        Ok(())
+    }
+
     pub fn read_key_with_id(&self, name: &str) -> Result<(Zeroizing<Vec<u8>>, String)> {
         let key = self.read_key(name)?;
         let key_id = key_id_for_key_bytes(&key)?;
@@ -193,12 +217,7 @@ impl KeyStore {
         let bytes = Zeroizing::new(
             fs::read(&path).with_context(|| format!("failed to read key {}", path.display()))?,
         );
-        ensure!(
-            bytes.len() == RAW_KEY_LEN,
-            "stored key {name} must be exactly {RAW_KEY_LEN} bytes, got {} bytes",
-            bytes.len()
-        );
-        Ok(bytes)
+        decode_key_file(name, &bytes)
     }
 
     fn write_key(&self, name: &str, key: &[u8; RAW_KEY_LEN]) -> Result<()> {
@@ -220,7 +239,8 @@ impl KeyStore {
             "key material is already registered as {key_id}"
         );
 
-        write_secret_file(&path, key)
+        let encoded = Zeroizing::new(encode_key_file(key));
+        write_secret_file(&path, &encoded)
             .with_context(|| format!("failed to write key {}", path.display()))?;
         index.insert(key_id, name.to_owned());
         self.write_index(&index)
@@ -272,6 +292,48 @@ impl KeyStore {
         sync_dir(&self.root)?;
         Ok(())
     }
+}
+
+fn encode_key_file(key: &[u8; RAW_KEY_LEN]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(KEY_FILE_HEADER_LEN + RAW_KEY_LEN);
+    output.extend_from_slice(&KEY_FILE_MAGIC);
+    output.push(KEY_FILE_VERSION);
+    output.push(RAW_KEY_LEN as u8);
+    output.push(0);
+    output.push(0);
+    output.extend_from_slice(key);
+    output
+}
+
+fn decode_key_file(name: &str, bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
+    ensure!(
+        bytes.len() >= KEY_FILE_HEADER_LEN,
+        "stored key {name} is shorter than key file header"
+    );
+    ensure!(
+        bytes[..KEY_FILE_MAGIC.len()] == KEY_FILE_MAGIC,
+        "stored key {name} has invalid key file magic"
+    );
+    ensure!(
+        bytes[8] == KEY_FILE_VERSION,
+        "stored key {name} has unsupported key file version {}",
+        bytes[8]
+    );
+    ensure!(
+        bytes[9] as usize == RAW_KEY_LEN,
+        "stored key {name} declares invalid raw key length {}",
+        bytes[9]
+    );
+    ensure!(
+        bytes[10] == 0 && bytes[11] == 0,
+        "stored key {name} has non-zero reserved key file header bytes"
+    );
+    ensure!(
+        bytes.len() == KEY_FILE_HEADER_LEN + RAW_KEY_LEN,
+        "stored key {name} must contain a {RAW_KEY_LEN}-byte raw key payload, got {} payload bytes",
+        bytes.len().saturating_sub(KEY_FILE_HEADER_LEN)
+    );
+    Ok(Zeroizing::new(bytes[KEY_FILE_HEADER_LEN..].to_vec()))
 }
 
 pub fn key_id_for_key(key: &[u8; RAW_KEY_LEN]) -> String {
@@ -398,7 +460,10 @@ fn sync_dir(_path: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{KeyStore, key_id_for_key, validate_key_name};
+    use super::{
+        KEY_FILE_HEADER_LEN, KEY_FILE_MAGIC, KEY_FILE_VERSION, KeyStore, RAW_KEY_LEN,
+        key_id_for_key, validate_key_name,
+    };
     use crate::index_json::{format_string_map, parse_string_map};
     use std::collections::BTreeMap;
     use std::fs;
@@ -451,7 +516,12 @@ mod tests {
         let result = (|| {
             let store = KeyStore::discover_from(temp.path())?;
             store.generate_key("generated")?;
-            assert_eq!(fs::read(store.key_path("generated")?)?.len(), 32);
+            let generated = fs::read(store.key_path("generated")?)?;
+            assert_eq!(generated.len(), KEY_FILE_HEADER_LEN + RAW_KEY_LEN);
+            assert_eq!(&generated[..KEY_FILE_MAGIC.len()], &KEY_FILE_MAGIC);
+            assert_eq!(generated[8], KEY_FILE_VERSION);
+            assert_eq!(generated[9] as usize, RAW_KEY_LEN);
+            assert_eq!(&generated[10..12], &[0, 0]);
 
             let invalid = temp.path().join("invalid.key");
             fs::write(&invalid, [7_u8; 31])?;
@@ -462,6 +532,7 @@ mod tests {
             let imported = temp.path().join("imported.key");
             fs::write(&imported, [9_u8; 32])?;
             store.import_key("imported", &imported)?;
+            assert_eq!(store.read_key("imported")?.as_slice(), &[9_u8; 32]);
 
             let exported = temp.path().join("exported.key");
             store.export_key("imported", &exported)?;
@@ -470,6 +541,81 @@ mod tests {
         })();
 
         result.expect("raw key commands");
+    }
+
+    #[test]
+    fn delete_key_removes_key_file_and_index_entry() {
+        let temp = TempDir::new().expect("tempdir");
+        let status = Command::new("git")
+            .arg("init")
+            .current_dir(temp.path())
+            .status()
+            .expect("git init");
+        assert!(status.success());
+
+        let result = (|| {
+            let store = KeyStore::discover_from(temp.path())?;
+            store.store_key("default", &[8_u8; 32])?;
+            assert!(store.key_path("default")?.exists());
+            assert!(!store.read_index()?.is_empty());
+
+            store.delete_key("default")?;
+            assert!(!store.key_path("default")?.exists());
+            assert!(store.read_index()?.is_empty());
+            store
+                .delete_key("default")
+                .expect_err("missing key should fail");
+            Ok::<_, anyhow::Error>(())
+        })();
+
+        result.expect("delete key");
+    }
+
+    #[test]
+    fn versioned_key_files_reject_malformed_headers() {
+        let temp = TempDir::new().expect("tempdir");
+        let status = Command::new("git")
+            .arg("init")
+            .current_dir(temp.path())
+            .status()
+            .expect("git init");
+        assert!(status.success());
+
+        let result = (|| {
+            let store = KeyStore::discover_from(temp.path())?;
+            store.store_key("default", &[7_u8; 32])?;
+            let valid = fs::read(store.key_path("default")?)?;
+
+            let mut bad_magic = valid.clone();
+            bad_magic[0] = b'X';
+            fs::write(store.key_path("bad_magic")?, bad_magic)?;
+            store.read_key("bad_magic").expect_err("bad magic");
+
+            let mut bad_version = valid.clone();
+            bad_version[8] = KEY_FILE_VERSION + 1;
+            fs::write(store.key_path("bad_version")?, bad_version)?;
+            store.read_key("bad_version").expect_err("bad version");
+
+            let mut bad_key_len = valid.clone();
+            bad_key_len[9] = 31;
+            fs::write(store.key_path("bad_key_len")?, bad_key_len)?;
+            store.read_key("bad_key_len").expect_err("bad key length");
+
+            let mut bad_reserved = valid.clone();
+            bad_reserved[10] = 1;
+            fs::write(store.key_path("bad_reserved")?, bad_reserved)?;
+            store
+                .read_key("bad_reserved")
+                .expect_err("bad reserved byte");
+
+            let mut truncated = valid;
+            truncated.pop();
+            fs::write(store.key_path("truncated")?, truncated)?;
+            store.read_key("truncated").expect_err("truncated payload");
+            Ok::<_, anyhow::Error>(())
+        })();
+
+        result.expect("malformed key files");
     }
 
     #[test]

@@ -58,15 +58,16 @@ $ printf '4fa631b6f1efa130f281c5cca3658b78cc6352f24469a4620bfc83909e0cf483' | xx
 a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c  -
 ```
 
-After `derive-key`, the raw key lives under `.git/git-zcrypt/keys/` and the key
-id is recorded in `.git/git-zcrypt/index.json`:
+After `derive-key`, the key lives under `.git/git-zcrypt/keys/` in the versioned
+local key format, and the key id is recorded in `.git/git-zcrypt/index.json`:
 
 ```console
 $ hexdump -C .git/git-zcrypt/keys/test.key
-00000000  4f a6 31 b6 f1 ef a1 30  f2 81 c5 cc a3 65 8b 78  |O.1....0.....e.x|
-00000010  cc 63 52 f2 44 69 a4 62  0b fc 83 90 9e 0c f4 83  |.cR.Di.b........|
-$ shasum -a 256 .git/git-zcrypt/keys/test.key
-a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c  .git/git-zcrypt/keys/test.key
+00000000  47 5a 43 4b 45 59 00 00  01 20 00 00 4f a6 31 b6  |GZCKEY... ..O.1.|
+00000010  f1 ef a1 30 f2 81 c5 cc  a3 65 8b 78 cc 63 52 f2  |...0.....e.x.cR.|
+00000020  44 69 a4 62 0b fc 83 90  9e 0c f4 83              |Di.b........|
+$ tail -c 32 .git/git-zcrypt/keys/test.key | shasum -a 256
+a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c  -
 $ cat .git/git-zcrypt/index.json
 {
   "sha256:a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c": "test"
@@ -117,11 +118,18 @@ Export a local key for backup or transfer:
 git-zcrypt export-key --key default --output default.key
 ```
 
+Delete a local key when it should no longer be available in this clone:
+
+```sh
+git-zcrypt delete-key --key default
+```
+
 Key files and `index.json` are not committed by `git-zcrypt`; they live under
-`.git/git-zcrypt/`. Exported keys are raw 32-byte keys. Password-derived keys do
-not store KDF metadata; the fixed Argon2id parameters make the same password
-produce the same key id. Back keys up and transfer them securely. Losing the key
-makes encrypted blobs unrecoverable.
+`.git/git-zcrypt/`. Stored key files are versioned, while exported keys are raw
+32-byte keys. Password-derived keys do not store KDF metadata; the fixed
+Argon2id parameters make the same password produce the same key id. Back keys up
+and transfer them securely. Losing or deleting the only copy of a key makes
+encrypted blobs that use it unrecoverable.
 
 See [docs/data-formats.md](docs/data-formats.md) for the committed encrypted
 blob format and local key/index formats.

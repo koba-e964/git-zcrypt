@@ -155,6 +155,35 @@ fn duplicate_password_derived_key_fails() {
 }
 
 #[test]
+fn delete_key_removes_local_key_material() {
+    let repo = init_repo();
+
+    let clean = filter(&repo, &["clean", "--key", "default"], b"secret");
+    assert!(
+        clean.status.success(),
+        "{}",
+        String::from_utf8_lossy(&clean.stderr)
+    );
+
+    let delete = filter(&repo, &["delete-key", "--key", "default"], b"");
+    assert!(
+        delete.status.success(),
+        "{}",
+        String::from_utf8_lossy(&delete.stderr)
+    );
+    assert!(
+        !repo
+            .path()
+            .join(".git/git-zcrypt/keys/default.key")
+            .exists()
+    );
+
+    let smudge = filter(&repo, &["smudge"], &clean.stdout);
+    assert!(!smudge.status.success());
+    assert!(String::from_utf8_lossy(&smudge.stderr).contains("no local key is registered"));
+}
+
+#[test]
 fn empty_input_round_trips() {
     let repo = init_repo();
 

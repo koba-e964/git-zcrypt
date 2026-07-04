@@ -49,6 +49,11 @@ enum Command {
         #[arg(long)]
         output: PathBuf,
     },
+    /// Delete a locally stored key.
+    DeleteKey {
+        #[arg(long, alias = "name")]
+        key: String,
+    },
     /// Install local Git filter config.
     InstallFilter {
         #[arg(long, alias = "name")]
@@ -100,6 +105,10 @@ fn run(cli: Cli) -> Result<()> {
         Command::ExportKey { key, output } => {
             let store = key_store::KeyStore::discover()?;
             store.export_key(&key, &output)
+        }
+        Command::DeleteKey { key } => {
+            let store = key_store::KeyStore::discover()?;
+            store.delete_key(&key)
         }
         Command::InstallFilter { key } => git_config::install_filter(&key),
         Command::Status => git_config::print_status(),
@@ -169,6 +178,7 @@ mod tests {
                 "--output",
                 "key.bin",
             ],
+            vec!["git-zcrypt", "delete-key", "--key", "default"],
             vec!["git-zcrypt", "install-filter", "--key", "default"],
             vec!["git-zcrypt", "status"],
             vec!["git-zcrypt", "clean", "--key", "default"],
@@ -200,6 +210,7 @@ mod tests {
                 "--output",
                 "key.bin",
             ],
+            vec!["git-zcrypt", "delete-key", "--key", "default"],
             vec!["git-zcrypt", "install-filter", "--key", "default"],
             vec!["git-zcrypt", "clean", "--key", "default"],
         ] {

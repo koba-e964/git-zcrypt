@@ -33,21 +33,25 @@ Key ids are currently `sha256:` followed by 64 lowercase hex characters. The
 hash is SHA-256 over the raw 32-byte key material, not over a key alias or file
 name.
 
-## Local Key Format
+## Local Key File Format
 
-Each local key file is raw key material:
+Each local key file is a versioned binary wrapper around raw key material:
 
 ```text
-.git/git-zcrypt/keys/<name>.key
-size: 32 bytes
-contents: ChaCha20-Poly1305 key bytes
+offset  size            field
+0       8 bytes         magic: "GZCKEY\0\0"
+8       1 byte          version: 1
+9       1 byte          raw_key_len: 32
+10      2 bytes         reserved: 0, 0
+12      32 bytes        ChaCha20-Poly1305 key bytes
 ```
 
 Key names are local aliases and may contain only ASCII letters, digits, `_`, and
 `-`. On Unix, `git-zcrypt` writes key files with mode `0600`. Generated,
-imported, and password-derived keys all persist in this same raw 32-byte format.
+imported, and password-derived keys all persist in this same versioned format.
 Password-derived keys do not persist Argon2id parameters, salt, or other KDF
-metadata.
+metadata. `export-key` writes only the raw 32-byte key payload for backup or
+transfer.
 
 The local key index maps committed blob key ids back to local aliases:
 
