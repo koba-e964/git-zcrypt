@@ -50,6 +50,29 @@ trimmed before derivation:
 printf '%s\n' "$GIT_ZCRYPT_PASSWORD" | git-zcrypt derive-key --key default --stdin
 ```
 
+For example, deriving key `test` from password `password` produces this raw key
+material, whose SHA-256 hash is the stored key id:
+
+```console
+$ printf '4fa631b6f1efa130f281c5cca3658b78cc6352f24469a4620bfc83909e0cf483' | xxd -r -p | shasum -a 256
+a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c  -
+```
+
+After `derive-key`, the raw key lives under `.git/git-zcrypt/keys/` and the key
+id is recorded in `.git/git-zcrypt/index.json`:
+
+```console
+$ hexdump -C .git/git-zcrypt/keys/test.key
+00000000  4f a6 31 b6 f1 ef a1 30  f2 81 c5 cc a3 65 8b 78  |O.1....0.....e.x|
+00000010  cc 63 52 f2 44 69 a4 62  0b fc 83 90 9e 0c f4 83  |.cR.Di.b........|
+$ shasum -a 256 .git/git-zcrypt/keys/test.key
+a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c  .git/git-zcrypt/keys/test.key
+$ cat .git/git-zcrypt/index.json
+{
+  "sha256:a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c": "test"
+}
+```
+
 Install the local Git filter config:
 
 ```sh
@@ -60,6 +83,18 @@ Add a `.gitattributes` rule before adding sensitive files:
 
 ```gitattributes
 secrets/** filter=git-zcrypt diff=git-zcrypt
+```
+
+For example, this rule filters only files under `secrets/`:
+
+```console
+$ mkdir -p secrets
+$ printf 'test-secret\n' > secrets/secret.txt
+$ git check-attr filter diff -- secrets/secret.txt README.md
+secrets/secret.txt: filter: git-zcrypt
+secrets/secret.txt: diff: git-zcrypt
+README.md: filter: unspecified
+README.md: diff: unspecified
 ```
 
 Check local setup:
