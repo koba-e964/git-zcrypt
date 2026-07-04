@@ -9,3 +9,15 @@ id = "option-name-inconsistency"
 description = "keys should be given via --key option, regardless of the command"
 validation = "cargo test -- --list > /tmp/git-zcrypt-unit-tests.txt && (rg -q '^tests::parses_key_option_for_key_commands: test$' /tmp/git-zcrypt-unit-tests.txt || (echo 'missing test: tests::parses_key_option_for_key_commands' >&2; exit 1)) && cargo test tests::parses_key_option_for_key_commands -- --exact && rg -q 'generate-key --key|derive-key --key|install-filter --key|import-key --key|export-key --key' README.md"
 passes = true
+
+[[items]]
+id = "data-structure-doc"
+description = "for data structures this software handles (keys, encrypted files), formats should be documented"
+validation = "false"
+passes = false
+
+[[items]]
+id = "versioning"
+description = "for data structures this software handles (keys, encrypted files), version should be present"
+validation = "false"
+passes = false
