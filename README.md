@@ -123,6 +123,9 @@ not store KDF metadata; the fixed Argon2id parameters make the same password
 produce the same key id. Back keys up and transfer them securely. Losing the key
 makes encrypted blobs unrecoverable.
 
+See [docs/data-formats.md](docs/data-formats.md) for the committed encrypted
+blob format and local key/index formats.
+
 ## Safety Notes
 
 Configure `.gitattributes` and run `git-zcrypt install-filter` before adding

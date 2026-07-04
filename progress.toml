@@ -13,8 +13,8 @@ passes = true
 [[items]]
 id = "data-structure-doc"
 description = "for data structures this software handles (keys, encrypted files), formats should be documented"
-validation = "false"
-passes = false
+validation = "rg -q 'docs/data-formats\\.md' README.md && rg -q '^# Data Formats' docs/data-formats.md && rg -q '^## Encrypted Blob Format' docs/data-formats.md && rg -q 'magic: \"GZC1\\\\0\\\\0\\\\0\\\\0\"' docs/data-formats.md && rg -q 'version: 1' docs/data-formats.md && rg -q 'key_id_len' docs/data-formats.md && rg -q 'nonce_len: 12' docs/data-formats.md && rg -q 'reserved: 0' docs/data-formats.md && rg -q 'ChaCha20-Poly1305 ciphertext and tag' docs/data-formats.md && rg -q '^## Local Key Format' docs/data-formats.md && rg -q '\\.git/git-zcrypt/keys/<name>\\.key' docs/data-formats.md && rg -q 'size: 32 bytes' docs/data-formats.md && rg -q 'sha256:<64 lowercase hex chars>' docs/data-formats.md && rg -q 'constrained JSON object' docs/data-formats.md"
+passes = true
 
 [[items]]
 id = "versioning"
