@@ -1,3 +1,4 @@
+use crate::index_json;
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -233,7 +234,7 @@ impl KeyStore {
 
         let input = fs::read_to_string(&path)
             .with_context(|| format!("failed to read key index {}", path.display()))?;
-        let index = parse_index_json(&input)
+        let index = index_json::parse_string_map(&input)
             .with_context(|| format!("failed to parse key index {}", path.display()))?;
         for (key_id, name) in &index {
             validate_key_id(key_id)?;
@@ -246,7 +247,7 @@ impl KeyStore {
         self.init()?;
         let path = self.index_path();
         let temp_path = self.root.join(format!("{INDEX_FILE}.tmp"));
-        let json = format_index_json(index);
+        let json = index_json::format_string_map(index);
 
         {
             let mut file = fs::OpenOptions::new()
@@ -329,162 +330,6 @@ fn hex_lower(bytes: &[u8]) -> String {
     output
 }
 
-fn format_index_json(index: &BTreeMap<String, String>) -> String {
-    let mut output = String::from("{\n");
-    let len = index.len();
-    for (i, (key_id, name)) in index.iter().enumerate() {
-        output.push_str("  \"");
-        output.push_str(&escape_json_string(key_id));
-        output.push_str("\": \"");
-        output.push_str(&escape_json_string(name));
-        output.push('"');
-        if i + 1 != len {
-            output.push(',');
-        }
-        output.push('\n');
-    }
-    output.push_str("}\n");
-    output
-}
-
-fn escape_json_string(input: &str) -> String {
-    let mut output = String::new();
-    for byte in input.bytes() {
-        match byte {
-            b'"' => output.push_str("\\\""),
-            b'\\' => output.push_str("\\\\"),
-            b'\n' => output.push_str("\\n"),
-            b'\r' => output.push_str("\\r"),
-            b'\t' => output.push_str("\\t"),
-            0x20..=0x7e => output.push(byte as char),
-            _ => output.push_str(&format!("\\u{byte:04x}")),
-        }
-    }
-    output
-}
-
-fn parse_index_json(input: &str) -> Result<BTreeMap<String, String>> {
-    JsonParser::new(input).parse_object()
-}
-
-struct JsonParser<'a> {
-    bytes: &'a [u8],
-    position: usize,
-}
-
-impl<'a> JsonParser<'a> {
-    fn new(input: &'a str) -> Self {
-        Self {
-            bytes: input.as_bytes(),
-            position: 0,
-        }
-    }
-
-    fn parse_object(&mut self) -> Result<BTreeMap<String, String>> {
-        let mut map = BTreeMap::new();
-        self.skip_ws();
-        self.expect(b'{')?;
-        self.skip_ws();
-        if self.consume(b'}') {
-            self.finish()?;
-            return Ok(map);
-        }
-
-        loop {
-            self.skip_ws();
-            let key = self.parse_string()?;
-            ensure!(!map.contains_key(&key), "duplicate JSON key {key}");
-            self.skip_ws();
-            self.expect(b':')?;
-            self.skip_ws();
-            let value = self.parse_string()?;
-            map.insert(key, value);
-            self.skip_ws();
-            if self.consume(b'}') {
-                self.finish()?;
-                return Ok(map);
-            }
-            self.expect(b',')?;
-        }
-    }
-
-    fn parse_string(&mut self) -> Result<String> {
-        self.expect(b'"')?;
-        let mut output = String::new();
-        while let Some(byte) = self.next() {
-            match byte {
-                b'"' => return Ok(output),
-                b'\\' => {
-                    let escaped = self.next().context("unterminated JSON escape")?;
-                    match escaped {
-                        b'"' => output.push('"'),
-                        b'\\' => output.push('\\'),
-                        b'/' => output.push('/'),
-                        b'b' => output.push('\u{0008}'),
-                        b'f' => output.push('\u{000c}'),
-                        b'n' => output.push('\n'),
-                        b'r' => output.push('\r'),
-                        b't' => output.push('\t'),
-                        _ => bail!("invalid JSON escape"),
-                    }
-                }
-                0x00..=0x1f => bail!("unescaped control byte in JSON string"),
-                _ => output.push(byte as char),
-            }
-        }
-        bail!("unterminated JSON string")
-    }
-
-    fn skip_ws(&mut self) {
-        while let Some(byte) = self.peek() {
-            if matches!(byte, b' ' | b'\n' | b'\r' | b'\t') {
-                self.position += 1;
-            } else {
-                break;
-            }
-        }
-    }
-
-    fn finish(&mut self) -> Result<()> {
-        self.skip_ws();
-        ensure!(
-            self.position == self.bytes.len(),
-            "trailing data after JSON object"
-        );
-        Ok(())
-    }
-
-    fn expect(&mut self, expected: u8) -> Result<()> {
-        let actual = self.next().context("unexpected end of JSON")?;
-        ensure!(
-            actual == expected,
-            "expected JSON byte '{}' but found '{}'",
-            expected as char,
-            actual as char
-        );
-        Ok(())
-    }
-
-    fn consume(&mut self, expected: u8) -> bool {
-        if self.peek() == Some(expected) {
-            self.position += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn peek(&self) -> Option<u8> {
-        self.bytes.get(self.position).copied()
-    }
-
-    fn next(&mut self) -> Option<u8> {
-        let byte = self.peek()?;
-        self.position += 1;
-        Some(byte)
-    }
-}
-
 fn git_dir(cwd: Option<&Path>) -> Result<PathBuf> {
     let mut command = Command::new("git");
     command.args(["rev-parse", "--absolute-git-dir"]);
@@ -553,7 +398,8 @@ fn sync_dir(_path: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{KeyStore, format_index_json, key_id_for_key, parse_index_json, validate_key_name};
+    use super::{KeyStore, key_id_for_key, validate_key_name};
+    use crate::index_json::{format_string_map, parse_string_map};
     use std::collections::BTreeMap;
     use std::fs;
     use std::process::Command;
@@ -647,9 +493,9 @@ mod tests {
             "alpha".to_owned(),
         );
 
-        let json = format_index_json(&index);
+        let json = format_string_map(&index);
         assert!(json.find("sha256:aaaa").unwrap() < json.find("sha256:bbbb").unwrap());
-        assert_eq!(parse_index_json(&json).expect("parse index"), index);
+        assert_eq!(parse_string_map(&json).expect("parse index"), index);
     }
 
     #[test]
@@ -662,7 +508,7 @@ mod tests {
             "{\"a\": \"b\"} trailing",
             "{\"a\": \"\\u0000\"}",
         ] {
-            parse_index_json(invalid).expect_err("invalid index json");
+            parse_string_map(invalid).expect_err("invalid index json");
         }
     }
 

@@ -7,6 +7,7 @@ mod blob;
 mod compression;
 mod crypto;
 mod git_config;
+mod index_json;
 mod kdf;
 mod key_store;
 
