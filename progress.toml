@@ -21,3 +21,15 @@ id = "versioning"
 description = "for data structures this software handles (keys, encrypted files), version should be present"
 validation = "false"
 passes = false
+
+[[items]]
+id = "avoid-clap"
+description = "clap is too heavy a crate (in size). use lighter one"
+validation = "false"
+passes = false
+
+[[items]]
+id = "auto-check-executable-sizes"
+description = "executable sizes matter. Use GitHub Actions to auto-check. You must decide the threshold for each platform"
+validation = "false"
+passes = false
