@@ -17,3 +17,8 @@ zeroize = { version = "1.8.2", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 tempfile = { version = "3.23.0", default-features = false, features = ["getrandom"] }
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
