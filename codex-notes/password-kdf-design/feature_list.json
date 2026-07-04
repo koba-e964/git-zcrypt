@@ -1,0 +1,46 @@
+{
+  "features": [
+    {
+      "id": "add-kdf-dependencies",
+      "description": "Add approved Argon2id, hidden prompt, SHA-2, and JSON dependencies to Cargo.toml and refresh Cargo.lock",
+      "validation": "cargo check; verifies dependency resolution and compilation",
+      "passes": false
+    },
+    {
+      "id": "add-key-id-index",
+      "description": "Add sha256-prefixed key id helpers and .git/git-zcrypt/index.json read/write/update support in src/key_store.rs",
+      "validation": "cargo test key_store; covers key id formatting, sorted JSON index writes, and duplicate key rejection",
+      "passes": false
+    },
+    {
+      "id": "update-raw-key-registration",
+      "description": "Update generate-key and import-key to register raw keys in index.json and reject duplicate key material",
+      "validation": "cargo test key_store; verifies generated/imported keys update index and duplicates fail",
+      "passes": false
+    },
+    {
+      "id": "add-password-derived-setup",
+      "description": "Add derive-key setup command with hidden confirmation prompt and --stdin password input",
+      "validation": "cargo test derive_key; covers stdin derivation, confirmation mismatch handling, and zeroized temporary buffers where observable",
+      "passes": false
+    },
+    {
+      "id": "use-key-ids-in-filters",
+      "description": "Update clean to write hash-prefixed blob key ids and smudge to resolve blob key ids through index.json",
+      "validation": "cargo test --test filter_roundtrip; verifies raw and password-derived keys round-trip through clean/smudge",
+      "passes": false
+    },
+    {
+      "id": "report-status-with-key-ids",
+      "description": "Update status output to list aliases with hash-prefixed key ids and warn on key/index mismatches",
+      "validation": "cargo test git_config; verifies status formatting and warning behavior where locally testable",
+      "passes": false
+    },
+    {
+      "id": "update-password-docs",
+      "description": "Update README.md and progress.toml for approved password-derived key behavior",
+      "validation": "cargo test && rg -q 'derive-key|sha256:' README.md && rg -q 'passes = true' progress.toml",
+      "passes": false
+    }
+  ]
+}
