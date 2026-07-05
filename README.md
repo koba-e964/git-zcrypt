@@ -104,6 +104,22 @@ Check local setup:
 git-zcrypt status
 ```
 
+## Filter Example
+
+Highly compressible input stays compact after clean, and smudge restores the
+original bytes:
+
+```console
+$ </dev/zero head -c 500000 | wc
+       0       1  500000
+$ </dev/zero head -c 500000 | git-zcrypt clean --key test | wc
+       2      14     617
+$ </dev/zero head -c 500000 | sha384sum
+478a159989441dac6279a2dd45b32a62ecc42f3ffccc976a1652da63e3e7ca4708d43b0f28fd147c5b4072f938cab913  -
+$ </dev/zero head -c 500000 | git-zcrypt clean --key test | git-zcrypt smudge | sha384sum
+478a159989441dac6279a2dd45b32a62ecc42f3ffccc976a1652da63e3e7ca4708d43b0f28fd147c5b4072f938cab913  -
+```
+
 ## Key Import And Export
 
 Import an existing 32-byte raw key:
