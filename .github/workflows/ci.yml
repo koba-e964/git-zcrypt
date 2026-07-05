@@ -11,7 +11,7 @@ jobs:
     name: rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check formatting
         run: cargo fmt --check
       - name: Run clippy
@@ -39,7 +39,7 @@ jobs:
             exe: target/release/git-zcrypt.exe
             max_size: 1600000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build release executable
         run: cargo build --release --locked
       - name: Check executable size

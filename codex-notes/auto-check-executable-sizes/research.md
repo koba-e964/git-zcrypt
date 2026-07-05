@@ -24,7 +24,7 @@
 ## Existing Patterns
 
 - Existing task validation commands in `progress.toml` use `rg` checks and concrete command-line validation.
-- GitHub Actions security rules allow `actions/*` by tag. Third-party actions must be pinned, so the workflow should avoid third-party actions.
+- GitHub Actions security rules allow `actions/*` by tag. Use the latest compatible `actions/*` tag after verification. Third-party actions must be pinned, so the workflow should avoid third-party actions.
 
 ## Pitfalls
 

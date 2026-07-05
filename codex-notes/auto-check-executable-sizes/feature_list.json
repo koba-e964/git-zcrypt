@@ -3,7 +3,7 @@
     {
       "id": "add-rust-ci",
       "description": "Add a GitHub Actions workflow that runs Rust formatting, clippy, and tests.",
-      "validation": "rg -q 'cargo fmt --check' .github/workflows/ci.yml && rg -q 'cargo clippy --locked --all-targets -- -D warnings' .github/workflows/ci.yml && rg -q 'cargo test --locked' .github/workflows/ci.yml",
+      "validation": "rg -q 'actions/checkout@v7' .github/workflows/ci.yml && rg -q 'cargo fmt --check' .github/workflows/ci.yml && rg -q 'cargo clippy --locked --all-targets -- -D warnings' .github/workflows/ci.yml && rg -q 'cargo test --locked' .github/workflows/ci.yml",
       "passes": true
     },
     {

@@ -20,7 +20,7 @@ Add a GitHub Actions CI workflow with standard Rust checks and a release executa
    - `cargo clippy --locked --all-targets -- -D warnings`
    - `cargo test --locked`
 3. Add an `executable-size` job with a matrix for `ubuntu-latest`, `macos-latest`, and `windows-latest`.
-4. Use only `actions/checkout` by tag, which is allowed by the GitHub Actions guardrail.
+4. Use `actions/checkout@v7`, the latest verified stable tag, which is allowed by the GitHub Actions guardrail.
 5. Build each platform executable with `cargo build --release --locked`.
 6. Measure executable byte size with Ruby's `File.size`, available on GitHub-hosted runners and portable across the matrix.
 7. Set initial thresholds with headroom for hosted-runner toolchain variation:
@@ -35,6 +35,7 @@ Add a GitHub Actions CI workflow with standard Rust checks and a release executa
 - Bash `wc -c < file`: plausible, but more fragile on Windows than a Ruby one-liner.
 - A separate executable-size workflow: rejected after user clarified that general Rust CI checks should be included too.
 - Third-party Rust toolchain actions: unnecessary because GitHub-hosted runners already include Rust here, and avoiding third-party actions keeps workflow pinning simple.
+- Older `actions/checkout` tags: rejected because workflow dependencies should use the latest compatible tag unless the user requests otherwise.
 
 ## Risks
 
