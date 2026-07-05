@@ -9,7 +9,7 @@
     {
       "id": "add-size-gate",
       "description": "Add a release executable-size matrix for Linux, macOS, and Windows with platform-specific thresholds.",
-      "validation": "rg -q 'cargo build --release --locked' .github/workflows/ci.yml && rg -q 'File.size' .github/workflows/ci.yml && rg -q 'max_size: 900000' .github/workflows/ci.yml && rg -q 'max_size: 1200000' .github/workflows/ci.yml && rg -q 'max_size: 1600000' .github/workflows/ci.yml",
+      "validation": "rg -q 'cargo build --release --locked' .github/workflows/ci.yml && rg -q 'File.size' .github/workflows/ci.yml && rg -q 'max_size: 850000' .github/workflows/ci.yml && rg -q 'max_size: 750000' .github/workflows/ci.yml && rg -q 'max_size: 550000' .github/workflows/ci.yml",
       "passes": true
     },
     {

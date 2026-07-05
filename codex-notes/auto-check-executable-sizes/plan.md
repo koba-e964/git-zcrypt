@@ -23,10 +23,10 @@ Add a GitHub Actions CI workflow with standard Rust checks and a release executa
 4. Use `actions/checkout@v7`, the latest verified stable tag, which is allowed by the GitHub Actions guardrail.
 5. Build each platform executable with `cargo build --release --locked`.
 6. Measure executable byte size with Ruby's `File.size`, available on GitHub-hosted runners and portable across the matrix.
-7. Set initial thresholds with headroom for hosted-runner toolchain variation:
-   - Linux: `900000`
-   - macOS: `1200000`
-   - Windows: `1600000`
+7. Set thresholds from GitHub Actions run `28735183007`, with modest headroom over measured sizes:
+   - Linux: measured `768480`, threshold `850000`
+   - macOS: measured `676032`, threshold `750000`
+   - Windows: measured `476672`, threshold `550000`
 8. Update `progress.toml` validation to check for the workflow, general Rust CI commands, platform thresholds, portable byte-size measurement, and locked release build.
 
 ## Alternatives Considered
@@ -39,8 +39,7 @@ Add a GitHub Actions CI workflow with standard Rust checks and a release executa
 
 ## Risks
 
-- Hosted runner toolchain updates can change binary size. The selected thresholds include headroom above the recent local release size while still catching large regressions.
-- Windows binary size is not locally measured here, so its threshold is intentionally more generous.
+- Hosted runner toolchain updates can change binary size. The selected thresholds include modest headroom above measured GitHub Actions sizes while still catching large regressions.
 
 ## Test Strategy
 
@@ -48,5 +47,5 @@ Add a GitHub Actions CI workflow with standard Rust checks and a release executa
 - Run `cargo clippy --locked --all-targets -- -D warnings`.
 - Run `cargo test --locked`.
 - Run `cargo build --release --locked`.
-- Measure the local release binary size.
+- Compare thresholds to GitHub Actions run `28735183007` executable sizes.
 - Run the updated `progress.toml` validation command.

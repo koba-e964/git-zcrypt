@@ -19,6 +19,7 @@
 - The package executable name is `git-zcrypt`.
 - Windows uses the `.exe` suffix; Linux and macOS do not.
 - Thresholds should be plain byte counts and not comma-separated.
+- Thresholds should be based on observed GitHub Actions runner sizes once those measurements are available.
 - The check should print the measured size for diagnostics.
 
 ## Existing Patterns

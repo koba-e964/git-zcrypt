@@ -29,15 +29,15 @@ jobs:
           - name: linux
             os: ubuntu-latest
             exe: target/release/git-zcrypt
-            max_size: 900000
+            max_size: 850000
           - name: macos
             os: macos-latest
             exe: target/release/git-zcrypt
-            max_size: 1200000
+            max_size: 750000
           - name: windows
             os: windows-latest
             exe: target/release/git-zcrypt.exe
-            max_size: 1600000
+            max_size: 550000
     steps:
       - uses: actions/checkout@v7
       - name: Build release executable
