@@ -1,10 +1,11 @@
-use anyhow::Result;
+use crate::error::Result;
 use std::io::{self, Read, Write};
 
 mod blob;
 mod cli;
 mod compression;
 mod crypto;
+mod error;
 mod git_config;
 mod index_json;
 mod kdf;

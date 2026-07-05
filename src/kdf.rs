@@ -1,5 +1,6 @@
+use crate::ensure;
+use crate::error::{Context, Error, Result};
 use crate::key_store::RAW_KEY_LEN;
-use anyhow::{Context, Result, anyhow, ensure};
 use argon2::{Algorithm, Argon2, Params, Version};
 use std::io::{self, Read};
 use zeroize::Zeroizing;
@@ -41,12 +42,12 @@ pub fn derive_key_from_password(password: &[u8]) -> Result<[u8; RAW_KEY_LEN]> {
         ARGON2_PARALLELISM,
         Some(RAW_KEY_LEN),
     )
-    .map_err(|error| anyhow!("invalid Argon2id parameters: {error:?}"))?;
+    .map_err(|error| Error::msg(format!("invalid Argon2id parameters: {error:?}")))?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut key = [0_u8; RAW_KEY_LEN];
     argon2
         .hash_password_into(password, PASSWORD_DOMAIN, &mut key)
-        .map_err(|error| anyhow!("failed to derive key from password: {error:?}"))?;
+        .map_err(|error| Error::msg(format!("failed to derive key from password: {error:?}")))?;
     Ok(key)
 }
 

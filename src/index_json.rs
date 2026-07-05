@@ -1,4 +1,5 @@
-use anyhow::{Context, Result, bail, ensure};
+use crate::error::{Context, Result};
+use crate::{bail, ensure};
 use std::collections::BTreeMap;
 
 pub(crate) fn format_string_map(index: &BTreeMap<String, String>) -> String {

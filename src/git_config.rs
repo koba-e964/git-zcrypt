@@ -1,5 +1,5 @@
+use crate::error::{Context, Error, Result};
 use crate::key_store::{self, KeyStatus, KeyStore};
-use anyhow::{Context, Result, anyhow};
 use std::process::Command;
 
 const FILTER_NAME: &str = "git-zcrypt";
@@ -88,10 +88,10 @@ fn git_config_set(key: &str, value: &str) -> Result<()> {
         .with_context(|| format!("failed to set local Git config {key}"))?;
 
     if !output.status.success() {
-        return Err(anyhow!(
+        return Err(Error::msg(format!(
             "failed to set local Git config {key}: {}",
             String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        )));
     }
 
     Ok(())
@@ -111,10 +111,10 @@ fn git_config_get(key: &str) -> Result<Option<String>> {
 
     match output.status.code() {
         Some(1) => Ok(None),
-        _ => Err(anyhow!(
+        _ => Err(Error::msg(format!(
             "failed to read local Git config {key}: {}",
             String::from_utf8_lossy(&output.stderr).trim()
-        )),
+        ))),
     }
 }
 
@@ -147,7 +147,7 @@ mod tests {
             assert_eq!(config.smudge.as_deref(), Some("git-zcrypt smudge"));
             assert_eq!(config.required.as_deref(), Some("true"));
             assert!(config.is_installed());
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, crate::error::Error>(())
         })();
         std::env::set_current_dir(original_dir).expect("restore cwd");
 
@@ -203,7 +203,7 @@ mod tests {
                     .iter()
                     .any(|warning| warning.contains("key index mismatch"))
             );
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, crate::error::Error>(())
         })();
 
         result.expect("status mismatch warning");

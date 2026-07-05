@@ -1,5 +1,6 @@
+use crate::error::{Context, Error, Result};
 use crate::index_json;
-use anyhow::{Context, Result, anyhow, bail, ensure};
+use crate::{bail, ensure};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -401,10 +402,10 @@ fn git_dir(cwd: Option<&Path>) -> Result<PathBuf> {
     let output = command.output().context("failed to locate Git directory")?;
 
     if !output.status.success() {
-        return Err(anyhow!(
+        return Err(Error::msg(format!(
             "not inside a Git repository: {}",
             String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        )));
     }
 
     let stdout = String::from_utf8(output.stdout).context("Git directory path is not UTF-8")?;
@@ -497,7 +498,7 @@ mod tests {
             assert!(store.root().ends_with(".git/git-zcrypt"));
             assert!(store.keys_dir().is_dir());
             assert!(store.key_path("default")?.ends_with("keys/default.key"));
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, crate::error::Error>(())
         })();
 
         result.expect("key store init");
@@ -537,7 +538,7 @@ mod tests {
             let exported = temp.path().join("exported.key");
             store.export_key("imported", &exported)?;
             assert_eq!(fs::read(exported)?, [9_u8; 32]);
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, crate::error::Error>(())
         })();
 
         result.expect("raw key commands");
@@ -565,7 +566,7 @@ mod tests {
             store
                 .delete_key("default")
                 .expect_err("missing key should fail");
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, crate::error::Error>(())
         })();
 
         result.expect("delete key");
@@ -612,7 +613,7 @@ mod tests {
             truncated.pop();
             fs::write(store.key_path("truncated")?, truncated)?;
             store.read_key("truncated").expect_err("truncated payload");
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, crate::error::Error>(())
         })();
 
         result.expect("malformed key files");
@@ -674,7 +675,7 @@ mod tests {
             store
                 .store_key("second", &[5_u8; 32])
                 .expect_err("duplicate key material");
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, crate::error::Error>(())
         })();
 
         result.expect("duplicate rejection");
