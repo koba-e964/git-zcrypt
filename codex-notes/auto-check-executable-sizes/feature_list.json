@@ -7,6 +7,12 @@
       "passes": true
     },
     {
+      "id": "add-scheduled-and-manual-triggers",
+      "description": "Configure CI to run weekly and on manual GitHub Actions dispatch.",
+      "validation": "rg -q 'workflow_dispatch:' .github/workflows/ci.yml && rg -q 'schedule:' .github/workflows/ci.yml && rg -q 'cron: \"0 0 \\* \\* 1\"' .github/workflows/ci.yml",
+      "passes": true
+    },
+    {
       "id": "add-size-gate",
       "description": "Add a release executable-size matrix for Linux, macOS, and Windows with platform-specific thresholds.",
       "validation": "rg -q 'cargo build --release --locked' .github/workflows/ci.yml && rg -q 'File.size' .github/workflows/ci.yml && rg -q 'max_size: 850000' .github/workflows/ci.yml && rg -q 'max_size: 750000' .github/workflows/ci.yml && rg -q 'max_size: 550000' .github/workflows/ci.yml",

@@ -11,6 +11,7 @@
 
 - General Rust CI should check formatting, lints, and tests.
 - Release executable size CI should build the binary on each target platform.
+- CI should also be available by manual `workflow_dispatch` and should run periodically once per week.
 - After `cargo build --release --locked`, the workflow can read the built executable byte size from `target/release/git-zcrypt` or `target/release/git-zcrypt.exe`.
 - The job fails when the measured byte size is above a platform-specific threshold.
 

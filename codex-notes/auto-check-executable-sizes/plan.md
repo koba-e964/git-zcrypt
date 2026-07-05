@@ -14,7 +14,7 @@ Add a GitHub Actions CI workflow with standard Rust checks and a release executa
 
 ## Implementation Steps
 
-1. Create a workflow triggered by pull requests and pushes to `main`.
+1. Create a workflow triggered by pull requests, pushes to `main`, manual `workflow_dispatch`, and a weekly schedule.
 2. Add a `rust` job on `ubuntu-latest` that runs:
    - `cargo fmt --check`
    - `cargo clippy --locked --all-targets -- -D warnings`
@@ -28,6 +28,7 @@ Add a GitHub Actions CI workflow with standard Rust checks and a release executa
    - macOS: measured `676032`, threshold `750000`
    - Windows: measured `476672`, threshold `550000`
 8. Update `progress.toml` validation to check for the workflow, general Rust CI commands, platform thresholds, portable byte-size measurement, and locked release build.
+9. Validate the workflow includes the manual trigger and weekly Monday 00:00 UTC cron schedule.
 
 ## Alternatives Considered
 
