@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 1"
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  rust:
+    name: rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Run clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Run tests
+        run: cargo test --locked
+
+  executable-size:
+    name: executable-size-${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+            exe: target/release/git-zcrypt
+            max_size: 850000
+          - name: macos
+            os: macos-latest
+            exe: target/release/git-zcrypt
+            max_size: 750000
+          - name: windows
+            os: windows-latest
+            exe: target/release/git-zcrypt.exe
+            max_size: 550000
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build release executable
+        run: cargo build --release --locked
+      - name: Check executable size
+        env:
+          EXE: ${{ matrix.exe }}
+          MAX_SIZE: ${{ matrix.max_size }}
+        run: |
+          ruby -e 'path = ENV.fetch("EXE"); max = Integer(ENV.fetch("MAX_SIZE")); size = File.size(path); puts "#{path}: #{size} bytes (limit #{max})"; exit(size <= max ? 0 : 1)'
