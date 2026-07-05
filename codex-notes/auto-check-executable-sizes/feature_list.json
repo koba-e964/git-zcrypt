@@ -1,0 +1,22 @@
+{
+  "features": [
+    {
+      "id": "add-rust-ci",
+      "description": "Add a GitHub Actions workflow that runs Rust formatting, clippy, and tests.",
+      "validation": "rg -q 'cargo fmt --check' .github/workflows/ci.yml && rg -q 'cargo clippy --locked --all-targets -- -D warnings' .github/workflows/ci.yml && rg -q 'cargo test --locked' .github/workflows/ci.yml",
+      "passes": true
+    },
+    {
+      "id": "add-size-gate",
+      "description": "Add a release executable-size matrix for Linux, macOS, and Windows with platform-specific thresholds.",
+      "validation": "rg -q 'cargo build --release --locked' .github/workflows/ci.yml && rg -q 'File.size' .github/workflows/ci.yml && rg -q 'max_size: 900000' .github/workflows/ci.yml && rg -q 'max_size: 1200000' .github/workflows/ci.yml && rg -q 'max_size: 1600000' .github/workflows/ci.yml",
+      "passes": true
+    },
+    {
+      "id": "update-progress",
+      "description": "Replace the placeholder auto-check-executable-sizes progress validation with checks for the CI workflow.",
+      "validation": "rg -q 'auto-check-executable-sizes' progress.toml && ! rg -q 'validation = \"false\"' progress.toml",
+      "passes": true
+    }
+  ]
+}
