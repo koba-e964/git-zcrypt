@@ -1,0 +1,34 @@
+{
+  "features": [
+    {
+      "id": "baseline-measurement",
+      "description": "Rebuild the current release binary in the dedicated worktree and record exact size plus cargo-bloat output.",
+      "validation": "cargo build --release; ls -l target/release/git-zcrypt; cargo bloat --release --crates; cargo bloat --release",
+      "passes": true
+    },
+    {
+      "id": "measure-candidates",
+      "description": "Test conservative size-reduction candidates that preserve panic behavior, symbol inspection, crypto, KDF, compression, and data formats.",
+      "validation": "Each retained candidate has before/after release byte size measurements; rejected candidates are left out of the final patch.",
+      "passes": true
+    },
+    {
+      "id": "apply-size-reduction",
+      "description": "Apply only measured code/profile changes that reduce executable size without unacceptable readability or diagnostic regressions.",
+      "validation": "git diff shows only the retained scoped changes; cargo build --release produces a smaller target/release/git-zcrypt than the baseline.",
+      "passes": true
+    },
+    {
+      "id": "validate-behavior",
+      "description": "Run the existing test suite after the final size-reduction patch.",
+      "validation": "cargo test",
+      "passes": true
+    },
+    {
+      "id": "final-size-report",
+      "description": "Run final release-size and bloat measurements and report before/after bytes and delta.",
+      "validation": "cargo build --release; ls -l target/release/git-zcrypt; cargo bloat --release --crates; cargo bloat --release",
+      "passes": true
+    }
+  ]
+}

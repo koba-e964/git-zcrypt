@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::{Context, Result};
 use flate2::Compression;
 use flate2::read::{ZlibDecoder, ZlibEncoder};
 use std::io::Read;

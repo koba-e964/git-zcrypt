@@ -1,4 +1,5 @@
-use anyhow::{Context, Result, bail, ensure};
+use crate::error::{Context, Result};
+use crate::{bail, ensure};
 
 pub const MAGIC: [u8; 8] = *b"GZC1\0\0\0\0";
 pub const VERSION: u8 = 1;

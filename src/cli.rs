@@ -1,4 +1,5 @@
-use anyhow::{Context, Result, bail, ensure};
+use crate::error::{Context, Result};
+use crate::{bail, ensure};
 use std::env;
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -111,8 +112,9 @@ impl Args {
     fn next_string(&mut self, context: &str) -> Result<Option<String>> {
         self.next()
             .map(|arg| {
-                arg.into_string()
-                    .map_err(|_| anyhow::anyhow!("{context}: argument is not UTF-8"))
+                arg.into_string().map_err(|_| {
+                    crate::error::Error::msg(format!("{context}: argument is not UTF-8"))
+                })
             })
             .transpose()
     }
@@ -206,7 +208,7 @@ fn parse_derive_key(args: &mut Args) -> Result<(String, bool)> {
 fn parse_option(command: &str, arg: OsString) -> Result<(&'static str, Option<OsString>)> {
     let arg = arg
         .into_string()
-        .map_err(|_| anyhow::anyhow!("{command}: option is not UTF-8"))?;
+        .map_err(|_| crate::error::Error::msg(format!("{command}: option is not UTF-8")))?;
     ensure!(
         arg.starts_with("--"),
         "{command}: unexpected positional argument '{arg}'"
@@ -248,7 +250,9 @@ fn option_string_value(
 ) -> Result<String> {
     option_value(command, option, inline_value, args)?
         .into_string()
-        .map_err(|_| anyhow::anyhow!("{command}: value for {option} is not UTF-8"))
+        .map_err(|_| {
+            crate::error::Error::msg(format!("{command}: value for {option} is not UTF-8"))
+        })
 }
 
 fn set_once<T>(command: &str, option: &str, target: &mut Option<T>, value: T) -> Result<()> {

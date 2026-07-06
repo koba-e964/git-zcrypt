@@ -1,6 +1,7 @@
 use crate::blob::{self, Blob, NONCE_LEN};
+use crate::ensure;
+use crate::error::{Context, Error, Result};
 use crate::key_store::{self, RAW_KEY_LEN};
-use anyhow::{Context, Result, anyhow, ensure};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Nonce};
 
@@ -22,7 +23,7 @@ pub fn encrypt(key: &[u8], key_id: &str, plaintext: &[u8]) -> Result<Blob> {
                 aad: &aad,
             },
         )
-        .map_err(|_| anyhow!("encryption failed"))?;
+        .map_err(|_| Error::msg("encryption failed"))?;
 
     Ok(Blob {
         key_id: key_id.to_owned(),
@@ -44,12 +45,12 @@ pub fn decrypt(key: &[u8], blob: &Blob) -> Result<Vec<u8>> {
                 aad: &blob.aad(),
             },
         )
-        .map_err(|_| anyhow!("decryption failed"))
+        .map_err(|_| Error::msg("decryption failed"))
 }
 
 fn cipher_from_key(key: &[u8]) -> Result<ChaCha20Poly1305> {
     ChaCha20Poly1305::new_from_slice(key)
-        .map_err(|_| anyhow!("raw key must be exactly {RAW_KEY_LEN} bytes"))
+        .map_err(|_| Error::msg(format!("raw key must be exactly {RAW_KEY_LEN} bytes")))
 }
 
 fn ensure_key_len(key: &[u8]) -> Result<()> {
