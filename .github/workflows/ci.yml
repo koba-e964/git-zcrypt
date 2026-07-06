@@ -43,6 +43,10 @@ jobs:
             max_size: 500000
     steps:
       - uses: actions/checkout@v7
+      - name: Print build environment
+        run: |
+          rustc --version --verbose
+          cargo --version --verbose
       - name: Build release executable
         run: cargo build --release --locked
       - name: Check executable size
