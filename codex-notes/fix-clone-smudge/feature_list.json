@@ -1,0 +1,58 @@
+{
+  "features": [
+    {
+      "id": "path-aware-filters",
+      "description": "Update installed filter commands and CLI parsing so clean and smudge receive the filtered file path.",
+      "validation": "cargo test cli::tests::parses_planned_subcommands -- --exact && cargo test git_config::tests::install_filter_writes_local_git_config -- --exact",
+      "passes": false
+    },
+    {
+      "id": "committed-key-manifest",
+      "description": "Add committed zit-crypt-keys.json parsing, formatting, validation, and nearest-ancestor lookup.",
+      "validation": "cargo test key_manifest::tests",
+      "passes": false
+    },
+    {
+      "id": "replace-local-index",
+      "description": "Replace .git/git-zcrypt/index.json as the durable key-id mapping with committed manifest lookup and local key scanning.",
+      "validation": "cargo test key_store::tests",
+      "passes": false
+    },
+    {
+      "id": "clean-updates-manifest",
+      "description": "Make clean update the nearest committed manifest for the filtered path with the selected key id.",
+      "validation": "cargo test --test filter_roundtrip clean_updates_committed_key_manifest -- --exact",
+      "passes": false
+    },
+    {
+      "id": "smudge-authorizes-by-manifest",
+      "description": "Make smudge require the blob key id to be declared by the nearest committed manifest.",
+      "validation": "cargo test --test filter_roundtrip smudge_rejects_manifest_mismatch -- --exact",
+      "passes": false
+    },
+    {
+      "id": "missing-key-pass-through",
+      "description": "Make smudge warn and pass encrypted bytes through when the manifest authorizes the blob key id but no local key is available.",
+      "validation": "cargo test --test filter_roundtrip missing_key_smudge_passes_through_manifest_authorized_blob -- --exact",
+      "passes": false
+    },
+    {
+      "id": "clone-without-key",
+      "description": "Add clone/checkout coverage showing a repo with committed manifests can be checked out without local key material.",
+      "validation": "cargo test --test filter_roundtrip clone_without_local_key_checks_out_encrypted_blob -- --exact",
+      "passes": false
+    },
+    {
+      "id": "document-manifest-flow",
+      "description": "Document committed manifests, clone-without-key behavior, and the validated re-smudge command after key setup.",
+      "validation": "rg -q 'zit-crypt-keys\\.json' README.md docs/data-formats.md",
+      "passes": false
+    },
+    {
+      "id": "full-validation",
+      "description": "Run formatting and the full test suite after implementation.",
+      "validation": "cargo fmt --check && cargo test",
+      "passes": false
+    }
+  ]
+}
