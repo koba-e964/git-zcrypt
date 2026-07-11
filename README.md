@@ -5,8 +5,9 @@ and encrypts them with ChaCha20-Poly1305 before Git stores them.
 
 Keys are stored locally under `.git/git-zcrypt/`. Raw 32-byte keys can be
 generated or imported directly, and password-derived keys can be created with
-Argon2id. Encrypted blobs store a hash-prefixed key id such as `sha256:...`;
-local aliases map to those ids through `.git/git-zcrypt/index.json`.
+Argon2id. Encrypted blobs store a hash-prefixed key id such as `sha256:...`.
+Committed `git-zcrypt-keys.json` manifests map those key ids to local aliases
+without storing raw key material.
 
 ## Install
 
@@ -59,7 +60,8 @@ a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c  -
 ```
 
 After `derive-key`, the key lives under `.git/git-zcrypt/keys/` in the versioned
-local key format, and the key id is recorded in `.git/git-zcrypt/index.json`:
+local key format. The key id is recorded in a committed manifest when filtered
+content is cleaned:
 
 ```console
 $ hexdump -C .git/git-zcrypt/keys/test.key
@@ -68,10 +70,23 @@ $ hexdump -C .git/git-zcrypt/keys/test.key
 00000020  44 69 a4 62 0b fc 83 90  9e 0c f4 83              |Di.b........|
 $ tail -c 32 .git/git-zcrypt/keys/test.key | shasum -a 256
 a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c  -
-$ cat .git/git-zcrypt/index.json
+$ cat git-zcrypt-keys.json
 {
   "sha256:a8a3cfd8a3833578e4d66ca0acc596fc0aa90df5656d354b3cf91fbd740d4f6c": "test"
 }
+```
+
+Create a root manifest explicitly when setting up a repository, or let the first
+clean create it automatically at the repository root:
+
+```sh
+git-zcrypt init-manifest
+```
+
+To create a narrower manifest boundary for a subdirectory, initialize one there:
+
+```sh
+git-zcrypt init-manifest --path secrets/team-a
 ```
 
 Install the local Git filter config:
@@ -112,11 +127,11 @@ original bytes:
 ```console
 $ </dev/zero head -c 500000 | wc
        0       1  500000
-$ </dev/zero head -c 500000 | git-zcrypt clean --key test | wc
+$ </dev/zero head -c 500000 | git-zcrypt clean --key test --path secrets/zero.bin | wc
        2      14     617
 $ </dev/zero head -c 500000 | sha384sum
 478a159989441dac6279a2dd45b32a62ecc42f3ffccc976a1652da63e3e7ca4708d43b0f28fd147c5b4072f938cab913  -
-$ </dev/zero head -c 500000 | git-zcrypt clean --key test | git-zcrypt smudge | sha384sum
+$ </dev/zero head -c 500000 | git-zcrypt clean --key test --path secrets/zero.bin | git-zcrypt smudge --path secrets/zero.bin | sha384sum
 478a159989441dac6279a2dd45b32a62ecc42f3ffccc976a1652da63e3e7ca4708d43b0f28fd147c5b4072f938cab913  -
 ```
 
@@ -140,15 +155,27 @@ Delete a local key when it should no longer be available in this clone:
 git-zcrypt delete-key --key default
 ```
 
-Key files and `index.json` are not committed by `git-zcrypt`; they live under
+Key files are not committed by `git-zcrypt`; they live under
 `.git/git-zcrypt/`. Stored key files are versioned, while exported keys are raw
 32-byte keys. Password-derived keys do not store KDF metadata; the fixed
-Argon2id parameters make the same password produce the same key id. Back keys up
-and transfer them securely. Losing or deleting the only copy of a key makes
-encrypted blobs that use it unrecoverable.
+Argon2id parameters make the same password produce the same key id.
+
+`git-zcrypt-keys.json` is committed and contains only key ids and local alias
+names. Smudge uses the nearest manifest found by walking from the filtered file's
+directory upward to the repository root. If a clone has the manifest but lacks
+the matching local key, smudge leaves the encrypted blob bytes in the worktree
+and exits successfully with a warning so clone and checkout can finish. After
+importing or deriving the missing key, re-smudge a file with:
+
+```sh
+git restore --source=HEAD --worktree -- secrets/secret.txt
+```
+
+Back keys up and transfer them securely. Losing or deleting the only copy of a
+key makes encrypted blobs that use it unrecoverable.
 
 See [docs/data-formats.md](docs/data-formats.md) for the committed encrypted
-blob format and local key/index formats.
+blob format, committed manifest format, and local key format.
 
 ## Safety Notes
 

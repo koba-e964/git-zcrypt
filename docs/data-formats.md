@@ -1,9 +1,9 @@
 # Data Formats
 
-`git-zcrypt` handles two persistent data structures: committed encrypted blobs
-and local repository keys. Encrypted blobs are part of Git history. Local keys
-and the key index live under `.git/git-zcrypt/` and are not committed by
-`git-zcrypt`.
+`git-zcrypt` handles three persistent data structures: committed encrypted
+blobs, committed key manifests, and local repository keys. Encrypted blobs and
+`git-zcrypt-keys.json` manifests are part of Git history. Local keys live under
+`.git/git-zcrypt/` and are not committed by `git-zcrypt`.
 
 ## Encrypted Blob Format
 
@@ -33,6 +33,28 @@ Key ids are currently `sha256:` followed by 64 lowercase hex characters. The
 hash is SHA-256 over the raw 32-byte key material, not over a key alias or file
 name.
 
+## Committed Key Manifest Format
+
+`git-zcrypt-keys.json` is a constrained JSON object mapping hash-prefixed key ids
+to key names:
+
+```json
+{
+  "sha256:<64 lowercase hex chars>": "<key-name>"
+}
+```
+
+The file contains no raw key material and is safe to commit. Entries are written
+in lexicographic key-id order. Duplicate JSON keys are rejected by the parser as
+far as they can be observed, and both key ids and key names are validated when a
+manifest is read. Key names may contain only ASCII letters, digits, `_`, and
+`-`.
+
+For a filtered path, `git-zcrypt` uses the nearest `git-zcrypt-keys.json` found
+by walking from the file's directory upward toward the repository root. A root
+manifest can be created with `git-zcrypt init-manifest`; subdirectory manifests
+can be created with `git-zcrypt init-manifest --path <dir>`.
+
 ## Local Key File Format
 
 Each local key file is a versioned binary wrapper around raw key material:
@@ -52,16 +74,3 @@ imported, and password-derived keys all persist in this same versioned format.
 Password-derived keys do not persist Argon2id parameters, salt, or other KDF
 metadata. `export-key` writes only the raw 32-byte key payload for backup or
 transfer.
-
-The local key index maps committed blob key ids back to local aliases:
-
-```json
-{
-  "sha256:<64 lowercase hex chars>": "<key-name>"
-}
-```
-
-The index file is `.git/git-zcrypt/index.json`. It is a constrained JSON object
-whose keys are hash-prefixed key ids and whose values are key names. Entries are
-written in lexicographic key order, duplicate JSON keys are rejected, and both
-key ids and key names are validated when the index is read.

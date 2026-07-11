@@ -9,6 +9,7 @@ mod error;
 mod git_config;
 mod index_json;
 mod kdf;
+mod key_manifest;
 mod key_store;
 
 use cli::{Cli, Command};
@@ -31,6 +32,7 @@ fn run(cli: Cli) -> Result<()> {
             let store = key_store::KeyStore::discover()?;
             store.init()
         }
+        Command::InitManifest { path } => key_manifest::init_manifest(&path).map(|_| ()),
         Command::GenerateKey { key } => {
             let store = key_store::KeyStore::discover()?;
             store.generate_key(&key)
@@ -60,26 +62,41 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::InstallFilter { key } => git_config::install_filter(&key),
         Command::Status => git_config::print_status(),
-        Command::Clean { key } => clean(&key),
-        Command::Smudge => smudge(),
+        Command::Clean { key, path } => clean(&key, &path),
+        Command::Smudge { path } => smudge(&path),
     }
 }
 
-fn clean(key_name: &str) -> Result<()> {
+fn clean(key_name: &str, path: &std::path::Path) -> Result<()> {
     let store = key_store::KeyStore::discover()?;
     let (key, key_id) = store.read_key_with_id(key_name)?;
     let input = read_stdin()?;
     let compressed = compression::compress(&input)?;
     let encrypted = crypto::encrypt(&key, &key_id, &compressed)?;
+    key_manifest::add_key_for_path(path, &encrypted.key_id, key_name)?;
     let encoded = blob::encode(&encrypted.key_id, &encrypted.nonce, &encrypted.ciphertext)?;
     write_stdout(&encoded)
 }
 
-fn smudge() -> Result<()> {
+fn smudge(path: &std::path::Path) -> Result<()> {
     let store = key_store::KeyStore::discover()?;
     let input = read_stdin()?;
     let encrypted = blob::decode(&input)?;
-    let key = store.read_key_by_id(&encrypted.key_id)?;
+    if !key_manifest::key_allowed_for_path(path, &encrypted.key_id)? {
+        crate::bail!(
+            "key {} is not declared for {}",
+            encrypted.key_id,
+            path.display()
+        );
+    }
+    let Some(key) = store.try_read_key_by_id(&encrypted.key_id)? else {
+        eprintln!(
+            "warning: no local key is registered for {}; leaving encrypted bytes for {}",
+            encrypted.key_id,
+            path.display()
+        );
+        return write_stdout(&input);
+    };
     let compressed = crypto::decrypt(&key, &encrypted)?;
     let plaintext = compression::decompress(&compressed)?;
     write_stdout(&plaintext)

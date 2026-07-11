@@ -9,8 +9,11 @@ const REQUIRED_KEY: &str = "filter.git-zcrypt.required";
 
 pub fn install_filter(key_name: &str) -> Result<()> {
     key_store::validate_key_name(key_name)?;
-    git_config_set(CLEAN_KEY, &format!("git-zcrypt clean --key {key_name}"))?;
-    git_config_set(SMUDGE_KEY, "git-zcrypt smudge")?;
+    git_config_set(
+        CLEAN_KEY,
+        &format!("git-zcrypt clean --key {key_name} --path %f"),
+    )?;
+    git_config_set(SMUDGE_KEY, "git-zcrypt smudge --path %f")?;
     git_config_set(REQUIRED_KEY, "true")?;
     Ok(())
 }
@@ -65,10 +68,10 @@ struct FilterConfig {
 
 impl FilterConfig {
     fn is_installed(&self) -> bool {
-        self.clean
-            .as_deref()
-            .is_some_and(|value| value.starts_with(&format!("{FILTER_NAME} clean --key ")))
-            && self.smudge.as_deref() == Some("git-zcrypt smudge")
+        self.clean.as_deref().is_some_and(|value| {
+            value.starts_with(&format!("{FILTER_NAME} clean --key "))
+                && value.contains(" --path %f")
+        }) && self.smudge.as_deref() == Some("git-zcrypt smudge --path %f")
             && self.required.as_deref() == Some("true")
     }
 }
@@ -122,7 +125,7 @@ fn git_config_get(key: &str) -> Result<Option<String>> {
 mod tests {
     use super::{filter_config, format_keys, install_filter};
     use crate::key_store::{KeyStatus, KeyStore};
-    use std::{fs, process::Command};
+    use std::process::Command;
     use tempfile::TempDir;
 
     #[test]
@@ -142,9 +145,12 @@ mod tests {
             let config = filter_config()?;
             assert_eq!(
                 config.clean.as_deref(),
-                Some("git-zcrypt clean --key default")
+                Some("git-zcrypt clean --key default --path %f")
             );
-            assert_eq!(config.smudge.as_deref(), Some("git-zcrypt smudge"));
+            assert_eq!(
+                config.smudge.as_deref(),
+                Some("git-zcrypt smudge --path %f")
+            );
             assert_eq!(config.required.as_deref(), Some("true"));
             assert!(config.is_installed());
             Ok::<_, crate::error::Error>(())
@@ -180,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn status_warns_on_key_index_mismatch() {
+    fn status_lists_local_key_files() {
         let temp = TempDir::new().expect("tempdir");
         let status = Command::new("git")
             .arg("init")
@@ -192,20 +198,14 @@ mod tests {
         let result = (|| {
             let store = KeyStore::discover_from(temp.path())?;
             store.store_key("default", &[1_u8; 32])?;
-            fs::write(
-                store.index_path(),
-                "{\n  \"sha256:0000000000000000000000000000000000000000000000000000000000000000\": \"default\"\n}\n",
-            )?;
             let (keys, warnings) = store.indexed_keys()?;
-            assert!(keys.is_empty());
-            assert!(
-                warnings
-                    .iter()
-                    .any(|warning| warning.contains("key index mismatch"))
-            );
+            assert!(warnings.is_empty());
+            assert_eq!(keys.len(), 1);
+            assert_eq!(keys[0].name, "default");
+            assert!(keys[0].key_id.starts_with("sha256:"));
             Ok::<_, crate::error::Error>(())
         })();
 
-        result.expect("status mismatch warning");
+        result.expect("status local key listing");
     }
 }
