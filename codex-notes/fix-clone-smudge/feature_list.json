@@ -7,8 +7,14 @@
       "passes": false
     },
     {
+      "id": "init-manifest-command",
+      "description": "Add git-zcrypt init-manifest with optional --path to create git-zcrypt-keys.json in the current or specified directory.",
+      "validation": "cargo test cli::tests::parses_planned_subcommands -- --exact && cargo test --test filter_roundtrip init_manifest_creates_committed_key_manifest -- --exact",
+      "passes": false
+    },
+    {
       "id": "committed-key-manifest",
-      "description": "Add committed zit-crypt-keys.json parsing, formatting, validation, and nearest-ancestor lookup.",
+      "description": "Add committed git-zcrypt-keys.json parsing, formatting, validation, initialization, and nearest-ancestor lookup.",
       "validation": "cargo test key_manifest::tests",
       "passes": false
     },
@@ -20,7 +26,7 @@
     },
     {
       "id": "clean-updates-manifest",
-      "description": "Make clean update the nearest committed manifest for the filtered path with the selected key id.",
+      "description": "Make clean update the nearest existing committed manifest for the filtered path with the selected key id and fail clearly when none exists.",
       "validation": "cargo test --test filter_roundtrip clean_updates_committed_key_manifest -- --exact",
       "passes": false
     },
@@ -44,8 +50,8 @@
     },
     {
       "id": "document-manifest-flow",
-      "description": "Document committed manifests, clone-without-key behavior, and the validated re-smudge command after key setup.",
-      "validation": "rg -q 'zit-crypt-keys\\.json' README.md docs/data-formats.md",
+      "description": "Document init-manifest, committed manifests, clone-without-key behavior, and the validated re-smudge command after key setup.",
+      "validation": "rg -q 'git-zcrypt-keys\\.json' README.md docs/data-formats.md",
       "passes": false
     },
     {
