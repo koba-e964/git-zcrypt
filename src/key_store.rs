@@ -1,8 +1,6 @@
 use crate::error::{Context, Error, Result};
-use crate::index_json;
 use crate::{bail, ensure};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -11,7 +9,6 @@ use zeroize::{Zeroize, Zeroizing};
 
 pub const RAW_KEY_LEN: usize = 32;
 const KEY_ID_PREFIX: &str = "sha256:";
-const INDEX_FILE: &str = "index.json";
 const KEY_FILE_MAGIC: [u8; 8] = *b"GZCKEY\0\0";
 const KEY_FILE_VERSION: u8 = 1;
 const KEY_FILE_HEADER_LEN: usize = 12;
@@ -61,10 +58,6 @@ impl KeyStore {
         self.root.join("keys")
     }
 
-    pub fn index_path(&self) -> PathBuf {
-        self.root.join(INDEX_FILE)
-    }
-
     pub fn key_path(&self, name: &str) -> Result<PathBuf> {
         validate_key_name(name)?;
         Ok(self.keys_dir().join(format!("{name}.key")))
@@ -94,38 +87,16 @@ impl KeyStore {
     }
 
     pub fn indexed_keys(&self) -> Result<(Vec<KeyStatus>, Vec<String>)> {
-        let index = self.read_index()?;
         let mut warnings = Vec::new();
         let mut statuses = Vec::new();
-        let mut indexed_names = BTreeSet::new();
-
-        for (key_id, name) in &index {
-            indexed_names.insert(name.clone());
-            match self.read_key(name) {
-                Ok(key) => {
-                    let actual = key_id_for_key_bytes(&key)?;
-                    if actual == *key_id {
-                        statuses.push(KeyStatus {
-                            name: name.clone(),
-                            key_id: key_id.clone(),
-                        });
-                    } else {
-                        warnings.push(format!(
-                            "key index mismatch: {name} is indexed as {key_id} but computes to {actual}"
-                        ));
-                    }
-                }
-                Err(error) => warnings.push(format!(
-                    "key index mismatch: {key_id} points to {name}, but the key cannot be read: {error:#}"
-                )),
-            }
-        }
 
         for name in self.key_names()? {
-            if !indexed_names.contains(&name) {
-                warnings.push(format!(
-                    "key index mismatch: {name} exists but is not indexed"
-                ));
+            match self.read_key(&name) {
+                Ok(key) => statuses.push(KeyStatus {
+                    name,
+                    key_id: key_id_for_key_bytes(&key)?,
+                }),
+                Err(error) => warnings.push(format!("local key {name} cannot be read: {error:#}")),
             }
         }
 
@@ -171,22 +142,10 @@ impl KeyStore {
 
     pub fn delete_key(&self, name: &str) -> Result<()> {
         let path = self.key_path(name)?;
-        let mut index = self.read_index()?;
-        let original_len = index.len();
-        index.retain(|_, indexed_name| indexed_name != name);
-        let was_indexed = index.len() != original_len;
-        let key_file_exists = path.exists();
-
-        ensure!(key_file_exists || was_indexed, "key {name} does not exist");
-
-        if was_indexed {
-            self.write_index(&index)?;
-        }
-        if key_file_exists {
-            fs::remove_file(&path)
-                .with_context(|| format!("failed to delete key {}", path.display()))?;
-            sync_dir(&self.keys_dir())?;
-        }
+        ensure!(path.exists(), "key {name} does not exist");
+        fs::remove_file(&path)
+            .with_context(|| format!("failed to delete key {}", path.display()))?;
+        sync_dir(&self.keys_dir())?;
         Ok(())
     }
 
@@ -196,21 +155,15 @@ impl KeyStore {
         Ok((key, key_id))
     }
 
-    pub fn read_key_by_id(&self, key_id: &str) -> Result<Zeroizing<Vec<u8>>> {
+    pub fn try_read_key_by_id(&self, key_id: &str) -> Result<Option<Zeroizing<Vec<u8>>>> {
         validate_key_id(key_id)?;
-        let index = self.read_index()?;
-        let name = index
-            .get(key_id)
-            .with_context(|| format!("no local key is registered for {key_id}"))?;
-        let key = self.read_key(name)?;
-        let actual = key_id_for_key_bytes(&key)?;
-        if actual != key_id {
-            eprintln!(
-                "warning: key index mismatch: {key_id} points to {name}, but the key computes to {actual}"
-            );
-            bail!("key index mismatch for {key_id}");
+        for name in self.key_names()? {
+            let key = self.read_key(&name)?;
+            if key_id_for_key_bytes(&key)? == key_id {
+                return Ok(Some(key));
+            }
         }
-        Ok(key)
+        Ok(None)
     }
 
     pub fn read_key(&self, name: &str) -> Result<Zeroizing<Vec<u8>>> {
@@ -229,69 +182,15 @@ impl KeyStore {
             "key {name} already exists; refusing to overwrite"
         );
 
-        let mut index = self.read_index()?;
-        ensure!(
-            !index.values().any(|existing| existing == name),
-            "key alias {name} is already registered"
-        );
         let key_id = key_id_for_key(key);
         ensure!(
-            !index.contains_key(&key_id),
+            self.try_read_key_by_id(&key_id)?.is_none(),
             "key material is already registered as {key_id}"
         );
 
         let encoded = Zeroizing::new(encode_key_file(key));
         write_secret_file(&path, &encoded)
-            .with_context(|| format!("failed to write key {}", path.display()))?;
-        index.insert(key_id, name.to_owned());
-        self.write_index(&index)
-    }
-
-    fn read_index(&self) -> Result<BTreeMap<String, String>> {
-        let path = self.index_path();
-        if !path.exists() {
-            return Ok(BTreeMap::new());
-        }
-
-        let input = fs::read_to_string(&path)
-            .with_context(|| format!("failed to read key index {}", path.display()))?;
-        let index = index_json::parse_string_map(&input)
-            .with_context(|| format!("failed to parse key index {}", path.display()))?;
-        for (key_id, name) in &index {
-            validate_key_id(key_id)?;
-            validate_key_name(name)?;
-        }
-        Ok(index)
-    }
-
-    fn write_index(&self, index: &BTreeMap<String, String>) -> Result<()> {
-        self.init()?;
-        let path = self.index_path();
-        let temp_path = self.root.join(format!("{INDEX_FILE}.tmp"));
-        let json = index_json::format_string_map(index);
-
-        {
-            let mut file = fs::OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(&temp_path)
-                .with_context(|| {
-                    format!("failed to open temporary key index {}", temp_path.display())
-                })?;
-            file.write_all(json.as_bytes())?;
-            file.sync_all()?;
-        }
-
-        fs::rename(&temp_path, &path).with_context(|| {
-            format!(
-                "failed to replace key index {} with {}",
-                path.display(),
-                temp_path.display()
-            )
-        })?;
-        sync_dir(&self.root)?;
-        Ok(())
+            .with_context(|| format!("failed to write key {}", path.display()))
     }
 }
 
@@ -545,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn delete_key_removes_key_file_and_index_entry() {
+    fn delete_key_removes_local_key_file() {
         let temp = TempDir::new().expect("tempdir");
         let status = Command::new("git")
             .arg("init")
@@ -558,11 +457,19 @@ mod tests {
             let store = KeyStore::discover_from(temp.path())?;
             store.store_key("default", &[8_u8; 32])?;
             assert!(store.key_path("default")?.exists());
-            assert!(!store.read_index()?.is_empty());
+            assert!(
+                store
+                    .try_read_key_by_id(&key_id_for_key(&[8_u8; 32]))?
+                    .is_some()
+            );
 
             store.delete_key("default")?;
             assert!(!store.key_path("default")?.exists());
-            assert!(store.read_index()?.is_empty());
+            assert!(
+                store
+                    .try_read_key_by_id(&key_id_for_key(&[8_u8; 32]))?
+                    .is_none()
+            );
             store
                 .delete_key("default")
                 .expect_err("missing key should fail");
