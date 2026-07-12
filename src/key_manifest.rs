@@ -3,6 +3,7 @@ use crate::index_json;
 use crate::key_store;
 use crate::{bail, ensure};
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
@@ -113,12 +114,9 @@ fn target_dir(root: &Path, target: &Path) -> Result<PathBuf> {
 }
 
 fn resolve_dir(root: &Path, path: &Path) -> Result<PathBuf> {
-    if path.as_os_str().is_empty() || path == Path::new(".") {
-        return Ok(root.to_path_buf());
-    }
     ensure!(
         !path.is_absolute(),
-        "manifest path must be repository-relative: {}",
+        "manifest path must be relative: {}",
         path.display()
     );
     for component in path.components() {
@@ -132,7 +130,19 @@ fn resolve_dir(root: &Path, path: &Path) -> Result<PathBuf> {
             );
         }
     }
-    Ok(root.join(path))
+
+    let current_dir = env::current_dir().context("failed to get current directory")?;
+    let dir = if path.as_os_str().is_empty() || path == Path::new(".") {
+        current_dir
+    } else {
+        current_dir.join(path)
+    };
+    ensure!(
+        dir.starts_with(root),
+        "manifest path must stay inside the repository: {}",
+        path.display()
+    );
+    Ok(dir)
 }
 
 fn write_manifest(path: &Path, keys: &BTreeMap<String, String>) -> Result<()> {

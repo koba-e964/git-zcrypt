@@ -104,6 +104,23 @@ fn init_manifest_creates_committed_key_manifest() {
             .expect("nested manifest"),
         "{\n}\n"
     );
+
+    std::fs::create_dir_all(repo.path().join("secrets/team-b")).expect("mkdir");
+    let subdir = Command::new(git_zcrypt())
+        .arg("init-manifest")
+        .current_dir(repo.path().join("secrets/team-b"))
+        .output()
+        .expect("git-zcrypt init-manifest in subdir");
+    assert!(
+        subdir.status.success(),
+        "{}",
+        String::from_utf8_lossy(&subdir.stderr)
+    );
+    assert_eq!(
+        std::fs::read_to_string(repo.path().join("secrets/team-b/git-zcrypt-keys.json"))
+            .expect("subdir manifest"),
+        "{\n}\n"
+    );
 }
 
 #[test]
