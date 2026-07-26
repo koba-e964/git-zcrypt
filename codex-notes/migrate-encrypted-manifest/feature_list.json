@@ -1,15 +1,15 @@
 {
   "features": [
     {
-      "id": "parse-register-file",
-      "description": "Add a register-file --path <path> CLI command to src/cli.rs and usage text.",
+      "id": "parse-register",
+      "description": "Add a register [--manifest-dir <dir>] <file>... CLI command to src/cli.rs and usage text.",
       "validation": "cargo test cli::tests::parses_planned_subcommands -- --exact",
       "passes": false,
       "boundary": {
         "files_dirs": [
           "src/cli.rs"
         ],
-        "semantic_changes": "Add parsing and usage for register-file --path <path>.",
+        "semantic_changes": "Add manifest-dir option and positional multi-file parsing.",
         "capability": "Edit files; run parser test."
       }
     },
@@ -27,9 +27,9 @@
       }
     },
     {
-      "id": "register-file-command",
-      "description": "Implement register-file so it reads encrypted file bytes, extracts the blob key id, adds a nearest-manifest entry when a matching local key exists, and creates the manifest file with a warning when no matching key exists.",
-      "validation": "cargo test --test filter_roundtrip register_file_updates_nearest_manifest_without_rewriting_file -- --exact",
+      "id": "register-command",
+      "description": "Implement register so files are cwd-relative, the manifest comes from --manifest-dir or cwd, and multiple encrypted files are supported.",
+      "validation": "cargo test --test filter_roundtrip register_updates_selected_manifest_without_rewriting_file -- --exact",
       "passes": false,
       "boundary": {
         "files_dirs": [
@@ -39,14 +39,14 @@
           "src/key_manifest.rs",
           "tests/filter_roundtrip.rs"
         ],
-        "semantic_changes": "Register found key ids; warn and create manifest when key is missing.",
+        "semantic_changes": "Register files into explicit or cwd manifest.",
         "capability": "Edit files; run targeted Rust tests."
       }
     },
     {
-      "id": "register-file-missing-key-warning",
-      "description": "Add coverage proving register-file warns and creates the manifest file without adding a key entry when no matching local key exists.",
-      "validation": "cargo test --test filter_roundtrip register_file_warns_and_creates_manifest_without_matching_local_key -- --exact",
+      "id": "register-missing-key-warning",
+      "description": "Add coverage proving register warns and creates the selected manifest file without adding a key entry when no matching local key exists.",
+      "validation": "cargo test --test filter_roundtrip register_warns_and_creates_manifest_without_matching_local_key -- --exact",
       "passes": false,
       "boundary": {
         "files_dirs": [
@@ -55,21 +55,21 @@
           "src/key_store.rs",
           "src/key_manifest.rs"
         ],
-        "semantic_changes": "Warn and create manifest without entry when local key is missing.",
+        "semantic_changes": "Warn and create selected manifest without entry.",
         "capability": "Edit files; run targeted Rust tests."
       }
     },
     {
-      "id": "document-register-file",
-      "description": "Document register-file migration behavior in README.md and docs/data-formats.md.",
-      "validation": "rg -q register-file README.md docs/data-formats.md",
+      "id": "document-register",
+      "description": "Document register migration behavior in README.md and docs/data-formats.md.",
+      "validation": "rg -q \"git-zcrypt register\" README.md docs/data-formats.md",
       "passes": false,
       "boundary": {
         "files_dirs": [
           "README.md",
           "docs/data-formats.md"
         ],
-        "semantic_changes": "Document register-file migration behavior.",
+        "semantic_changes": "Document paths, override, and multi-file usage.",
         "capability": "Edit files; run rg doc check."
       }
     },
