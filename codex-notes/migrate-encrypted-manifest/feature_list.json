@@ -1,0 +1,93 @@
+{
+  "features": [
+    {
+      "id": "parse-register-file",
+      "description": "Add a register-file --path <path> CLI command to src/cli.rs and usage text.",
+      "validation": "cargo test cli::tests::parses_planned_subcommands -- --exact",
+      "passes": false,
+      "boundary": {
+        "files_dirs": [
+          "src/cli.rs"
+        ],
+        "semantic_changes": "Add parsing and usage for register-file --path <path>.",
+        "capability": "Edit files; run parser test."
+      }
+    },
+    {
+      "id": "lookup-local-key-alias",
+      "description": "Add a key-store API that finds the local alias matching an embedded sha256 key id and errors on duplicate aliases.",
+      "validation": "Validate through full cargo test and targeted integration coverage.",
+      "passes": false,
+      "boundary": {
+        "files_dirs": [
+          "src/key_store.rs"
+        ],
+        "semantic_changes": "Find local alias matching an embedded sha256 key id.",
+        "capability": "Edit files; run Rust tests."
+      }
+    },
+    {
+      "id": "register-file-command",
+      "description": "Implement register-file so it reads encrypted file bytes, extracts the blob key id, adds a nearest-manifest entry when a matching local key exists, and creates the manifest file with a warning when no matching key exists.",
+      "validation": "cargo test --test filter_roundtrip register_file_updates_nearest_manifest_without_rewriting_file -- --exact",
+      "passes": false,
+      "boundary": {
+        "files_dirs": [
+          "src/main.rs",
+          "src/cli.rs",
+          "src/key_store.rs",
+          "src/key_manifest.rs",
+          "tests/filter_roundtrip.rs"
+        ],
+        "semantic_changes": "Register found key ids; warn and create manifest when key is missing.",
+        "capability": "Edit files; run targeted Rust tests."
+      }
+    },
+    {
+      "id": "register-file-missing-key-warning",
+      "description": "Add coverage proving register-file warns and creates the manifest file without adding a key entry when no matching local key exists.",
+      "validation": "cargo test --test filter_roundtrip register_file_warns_and_creates_manifest_without_matching_local_key -- --exact",
+      "passes": false,
+      "boundary": {
+        "files_dirs": [
+          "tests/filter_roundtrip.rs",
+          "src/main.rs",
+          "src/key_store.rs",
+          "src/key_manifest.rs"
+        ],
+        "semantic_changes": "Warn and create manifest without entry when local key is missing.",
+        "capability": "Edit files; run targeted Rust tests."
+      }
+    },
+    {
+      "id": "document-register-file",
+      "description": "Document register-file migration behavior in README.md and docs/data-formats.md.",
+      "validation": "rg -q register-file README.md docs/data-formats.md",
+      "passes": false,
+      "boundary": {
+        "files_dirs": [
+          "README.md",
+          "docs/data-formats.md"
+        ],
+        "semantic_changes": "Document register-file migration behavior.",
+        "capability": "Edit files; run rg doc check."
+      }
+    },
+    {
+      "id": "full-validation",
+      "description": "Run formatting, the full test suite, release build, binary-size measurement, and applicable validators.",
+      "validation": "cargo fmt --check; cargo test; cargo build --release; ruby -e 'puts File.size(%q[target/release/git-zcrypt])'",
+      "passes": false,
+      "boundary": {
+        "files_dirs": [
+          "src",
+          "tests",
+          "README.md",
+          "docs"
+        ],
+        "semantic_changes": "Run validation and update passes incrementally.",
+        "capability": "Run fmt, tests, build, size, rg, and validator discovery."
+      }
+    }
+  ]
+}
