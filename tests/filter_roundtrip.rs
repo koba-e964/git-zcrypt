@@ -77,6 +77,33 @@ fn key_id_from_blob(blob: &[u8]) -> &str {
     std::str::from_utf8(&blob[key_id_start..key_id_start + key_id_len]).expect("key id utf8")
 }
 
+fn command_in(cwd: &std::path::Path, args: &[&str]) -> std::process::Output {
+    Command::new(git_zcrypt())
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .expect("git-zcrypt command")
+}
+
+fn write_encrypted_file(repo: &TempDir, path: &str, plaintext: &[u8]) -> Vec<u8> {
+    let clean = filter(
+        repo,
+        &["clean", "--key", "default", "--path", path],
+        plaintext,
+    );
+    assert!(
+        clean.status.success(),
+        "{}",
+        String::from_utf8_lossy(&clean.stderr)
+    );
+    let full_path = repo.path().join(path);
+    if let Some(parent) = full_path.parent() {
+        std::fs::create_dir_all(parent).expect("mkdir encrypted parent");
+    }
+    std::fs::write(&full_path, &clean.stdout).expect("write encrypted file");
+    clean.stdout
+}
+
 #[test]
 fn init_manifest_creates_committed_key_manifest() {
     let repo = init_empty_repo();
@@ -142,6 +169,105 @@ fn clean_updates_committed_key_manifest() {
         std::fs::read_to_string(repo.path().join("git-zcrypt-keys.json")).expect("read manifest");
     assert!(manifest.contains(key_id_from_blob(&clean.stdout)));
     assert!(manifest.contains("default"));
+}
+
+#[test]
+fn register_updates_selected_manifest_without_rewriting_file() {
+    let repo = init_repo();
+
+    let encrypted = write_encrypted_file(&repo, "secrets/team-a/secret.txt", b"secret");
+    let key_id = key_id_from_blob(&encrypted).to_owned();
+    std::fs::remove_file(repo.path().join("git-zcrypt-keys.json")).expect("remove root manifest");
+
+    let init = filter(&repo, &["init-manifest", "--path", "secrets"], b"");
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    let register = command_in(
+        &repo.path().join("secrets"),
+        &["register", "team-a/secret.txt"],
+    );
+    assert!(
+        register.status.success(),
+        "{}",
+        String::from_utf8_lossy(&register.stderr)
+    );
+
+    let manifest = std::fs::read_to_string(repo.path().join("secrets/git-zcrypt-keys.json"))
+        .expect("read selected manifest");
+    assert!(manifest.contains(&key_id));
+    assert!(manifest.contains("default"));
+    assert!(!repo.path().join("git-zcrypt-keys.json").exists());
+    assert_eq!(
+        std::fs::read(repo.path().join("secrets/team-a/secret.txt")).expect("read encrypted"),
+        encrypted
+    );
+
+    let parent_encrypted = write_encrypted_file(&repo, "secrets/team-a/parent.secret", b"parent");
+    let parent_register = command_in(
+        &repo.path().join("secrets/team-a"),
+        &["register", "--manifest-dir", "..", "parent.secret"],
+    );
+    assert!(
+        parent_register.status.success(),
+        "{}",
+        String::from_utf8_lossy(&parent_register.stderr)
+    );
+    assert_eq!(
+        std::fs::read(repo.path().join("secrets/team-a/parent.secret"))
+            .expect("read parent encrypted"),
+        parent_encrypted
+    );
+
+    std::fs::write(repo.path().join("secrets/git-zcrypt-keys.json"), "{\n}\n")
+        .expect("clear selected manifest");
+    let first = write_encrypted_file(&repo, "secrets/a.secret", b"a");
+    let second = write_encrypted_file(&repo, "secrets/b.secret", b"b");
+    std::fs::write(repo.path().join("secrets/git-zcrypt-keys.json"), "{\n}\n")
+        .expect("clear selected manifest again");
+    let multiple = command_in(
+        &repo.path().join("secrets"),
+        &["register", "a.secret", "b.secret"],
+    );
+    assert!(
+        multiple.status.success(),
+        "{}",
+        String::from_utf8_lossy(&multiple.stderr)
+    );
+    let manifest = std::fs::read_to_string(repo.path().join("secrets/git-zcrypt-keys.json"))
+        .expect("read multi manifest");
+    assert!(manifest.contains(key_id_from_blob(&first)));
+    assert!(manifest.contains(key_id_from_blob(&second)));
+}
+
+#[test]
+fn register_warns_and_creates_manifest_without_matching_local_key() {
+    let repo = init_repo();
+    let encrypted = write_encrypted_file(&repo, "secrets/team-a/missing.secret", b"missing");
+    let key_id = key_id_from_blob(&encrypted).to_owned();
+    std::fs::remove_file(repo.path().join("git-zcrypt-keys.json")).expect("remove root manifest");
+    std::fs::remove_file(repo.path().join(".git/git-zcrypt/keys/default.key"))
+        .expect("remove local key");
+
+    let register = command_in(
+        &repo.path().join("secrets/team-a"),
+        &["register", "missing.secret"],
+    );
+    assert!(
+        register.status.success(),
+        "{}",
+        String::from_utf8_lossy(&register.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&register.stderr);
+    assert!(stderr.contains("no local key is registered"));
+
+    let manifest = std::fs::read_to_string(repo.path().join("secrets/team-a/git-zcrypt-keys.json"))
+        .expect("read created manifest");
+    assert_eq!(manifest, "{\n}\n");
+    assert!(!manifest.contains(&key_id));
 }
 
 #[test]

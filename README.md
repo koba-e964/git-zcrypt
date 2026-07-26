@@ -89,6 +89,27 @@ To create a narrower manifest boundary for a subdirectory, initialize one there:
 git-zcrypt init-manifest --path secrets/team-a
 ```
 
+To migrate existing encrypted worktree files into a manifest, run `register`
+with one or more paths relative to your current directory. By default it creates
+or updates `git-zcrypt-keys.json` in the current directory:
+
+```sh
+cd secrets
+git-zcrypt register team-a/secret.txt team-b/secret.txt
+```
+
+Use `--manifest-dir <dir>` to select another manifest directory relative to the
+current directory:
+
+```sh
+git-zcrypt register --manifest-dir .. secret.txt
+```
+
+`register` reads encrypted blob metadata, adds a manifest entry only when the
+matching local key is available, and never rewrites the encrypted files. If a
+matching local key is missing, it creates the selected manifest file and warns
+without adding an entry.
+
 Install the local Git filter config:
 
 ```sh

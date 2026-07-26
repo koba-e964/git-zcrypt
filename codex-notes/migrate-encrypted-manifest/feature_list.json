@@ -4,7 +4,7 @@
       "id": "parse-register",
       "description": "Add a register [--manifest-dir <dir>] <file>... CLI command to src/cli.rs and usage text.",
       "validation": "cargo test cli::tests::parses_planned_subcommands -- --exact",
-      "passes": false,
+      "passes": true,
       "boundary": {
         "files_dirs": [
           "src/cli.rs"
@@ -17,7 +17,7 @@
       "id": "lookup-local-key-alias",
       "description": "Add a key-store API that finds the local alias matching an embedded sha256 key id and errors on duplicate aliases.",
       "validation": "Validate through full cargo test and targeted integration coverage.",
-      "passes": false,
+      "passes": true,
       "boundary": {
         "files_dirs": [
           "src/key_store.rs"
@@ -30,7 +30,7 @@
       "id": "register-command",
       "description": "Implement register so files are cwd-relative, the manifest comes from --manifest-dir or cwd, and multiple encrypted files are supported.",
       "validation": "cargo test --test filter_roundtrip register_updates_selected_manifest_without_rewriting_file -- --exact",
-      "passes": false,
+      "passes": true,
       "boundary": {
         "files_dirs": [
           "src/main.rs",
@@ -47,7 +47,7 @@
       "id": "register-missing-key-warning",
       "description": "Add coverage proving register warns and creates the selected manifest file without adding a key entry when no matching local key exists.",
       "validation": "cargo test --test filter_roundtrip register_warns_and_creates_manifest_without_matching_local_key -- --exact",
-      "passes": false,
+      "passes": true,
       "boundary": {
         "files_dirs": [
           "tests/filter_roundtrip.rs",
@@ -63,7 +63,7 @@
       "id": "document-register",
       "description": "Document register migration behavior in README.md and docs/data-formats.md.",
       "validation": "rg -q \"git-zcrypt register\" README.md docs/data-formats.md",
-      "passes": false,
+      "passes": true,
       "boundary": {
         "files_dirs": [
           "README.md",
@@ -77,7 +77,7 @@
       "id": "full-validation",
       "description": "Run formatting, the full test suite, release build, binary-size measurement, and applicable validators.",
       "validation": "cargo fmt --check; cargo test; cargo build --release; ruby -e 'puts File.size(%q[target/release/git-zcrypt])'",
-      "passes": false,
+      "passes": true,
       "boundary": {
         "files_dirs": [
           "src",

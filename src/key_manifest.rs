@@ -11,6 +11,19 @@ use std::process::Command;
 
 pub const MANIFEST_FILE: &str = "git-zcrypt-keys.json";
 
+#[derive(Debug)]
+pub struct SelectedManifest {
+    pub path: PathBuf,
+    dir: PathBuf,
+}
+
+#[derive(Debug)]
+pub struct ResolvedWorktreeFile {
+    pub input_path: PathBuf,
+    pub worktree_path: PathBuf,
+    pub repo_path: PathBuf,
+}
+
 pub fn init_manifest(path: &Path) -> Result<PathBuf> {
     let root = worktree_root()?;
     let dir = resolve_dir(&root, path)?;
@@ -30,21 +43,7 @@ pub fn add_key_for_path(path: &Path, key_id: &str, key_name: &str) -> Result<Pat
     key_store::validate_key_name(key_name)?;
     let root = worktree_root()?;
     let manifest = find_manifest_path(&root, path)?.unwrap_or_else(|| root.join(MANIFEST_FILE));
-    let mut keys = if manifest.exists() {
-        read_manifest(&manifest)?
-    } else {
-        BTreeMap::new()
-    };
-    if let Some(existing) = keys.get(key_id) {
-        ensure!(
-            existing == key_name,
-            "manifest {} maps {key_id} to {existing}, not {key_name}",
-            manifest.display()
-        );
-        return Ok(manifest);
-    }
-    keys.insert(key_id.to_owned(), key_name.to_owned());
-    write_manifest(&manifest, &keys)?;
+    add_key_to_manifest(&manifest, key_id, key_name)?;
     Ok(manifest)
 }
 
@@ -59,6 +58,103 @@ pub fn key_allowed_for_path(path: &Path, key_id: &str) -> Result<bool> {
     })?;
     let keys = read_manifest(&manifest)?;
     Ok(keys.contains_key(key_id))
+}
+
+pub fn resolve_worktree_file(path: &Path) -> Result<ResolvedWorktreeFile> {
+    ensure!(
+        !path.as_os_str().is_empty(),
+        "register path must not be empty"
+    );
+    ensure!(
+        !path.is_absolute(),
+        "register path must be relative: {}",
+        path.display()
+    );
+    let root = worktree_root()?;
+    let current_dir = env::current_dir().context("failed to get current directory")?;
+    let worktree_path = normalize_path(&current_dir.join(path));
+    ensure!(
+        worktree_path.starts_with(&root),
+        "register path must stay inside the repository: {}",
+        path.display()
+    );
+    let repo_path = worktree_path
+        .strip_prefix(&root)
+        .with_context(|| {
+            format!(
+                "register path must stay inside the repository: {}",
+                path.display()
+            )
+        })?
+        .to_path_buf();
+    ensure!(
+        !repo_path.as_os_str().is_empty(),
+        "register path must name a file"
+    );
+    Ok(ResolvedWorktreeFile {
+        input_path: path.to_path_buf(),
+        worktree_path,
+        repo_path,
+    })
+}
+
+pub fn resolve_selected_manifest_dir(path: Option<&Path>) -> Result<SelectedManifest> {
+    let root = worktree_root()?;
+    let dir = match path {
+        Some(path) => resolve_cwd_relative_dir(&root, path)?,
+        None => env::current_dir().context("failed to get current directory")?,
+    };
+    let dir = normalize_path(&dir);
+    ensure!(
+        dir.starts_with(&root),
+        "manifest path must stay inside the repository: {}",
+        path.unwrap_or_else(|| Path::new(".")).display()
+    );
+    Ok(SelectedManifest {
+        path: dir.join(MANIFEST_FILE),
+        dir,
+    })
+}
+
+pub fn ensure_manifest_covers_path(manifest: &SelectedManifest, repo_path: &Path) -> Result<()> {
+    let root = worktree_root()?;
+    let file_path = root.join(repo_path);
+    ensure!(
+        file_path.starts_with(&manifest.dir),
+        "manifest {} does not cover {}",
+        manifest.path.display(),
+        repo_path.display()
+    );
+    Ok(())
+}
+
+pub fn ensure_manifest(path: &Path) -> Result<()> {
+    if path.exists() {
+        read_manifest(path)?;
+    } else {
+        write_manifest(path, &BTreeMap::new())?;
+    }
+    Ok(())
+}
+
+pub fn add_key_to_manifest(path: &Path, key_id: &str, key_name: &str) -> Result<()> {
+    key_store::validate_key_id(key_id)?;
+    key_store::validate_key_name(key_name)?;
+    let mut keys = if path.exists() {
+        read_manifest(path)?
+    } else {
+        BTreeMap::new()
+    };
+    if let Some(existing) = keys.get(key_id) {
+        ensure!(
+            existing == key_name,
+            "manifest {} maps {key_id} to {existing}, not {key_name}",
+            path.display()
+        );
+        return Ok(());
+    }
+    keys.insert(key_id.to_owned(), key_name.to_owned());
+    write_manifest(path, &keys)
 }
 
 pub fn read_manifest(path: &Path) -> Result<BTreeMap<String, String>> {
@@ -143,6 +239,41 @@ fn resolve_dir(root: &Path, path: &Path) -> Result<PathBuf> {
         path.display()
     );
     Ok(dir)
+}
+
+fn resolve_cwd_relative_dir(root: &Path, path: &Path) -> Result<PathBuf> {
+    ensure!(
+        !path.is_absolute(),
+        "manifest path must be relative: {}",
+        path.display()
+    );
+    let current_dir = env::current_dir().context("failed to get current directory")?;
+    let dir = if path.as_os_str().is_empty() || path == Path::new(".") {
+        current_dir
+    } else {
+        current_dir.join(path)
+    };
+    let dir = normalize_path(&dir);
+    ensure!(
+        dir.starts_with(root),
+        "manifest path must stay inside the repository: {}",
+        path.display()
+    );
+    Ok(dir)
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized
 }
 
 fn write_manifest(path: &Path, keys: &BTreeMap<String, String>) -> Result<()> {

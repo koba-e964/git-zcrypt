@@ -166,6 +166,19 @@ impl KeyStore {
         Ok(None)
     }
 
+    pub fn key_name_for_id(&self, key_id: &str) -> Result<Option<String>> {
+        validate_key_id(key_id)?;
+        let mut found = None;
+        for name in self.key_names()? {
+            let key = self.read_key(&name)?;
+            if key_id_for_key_bytes(&key)? == key_id {
+                ensure!(found.is_none(), "multiple local keys match {key_id}");
+                found = Some(name);
+            }
+        }
+        Ok(found)
+    }
+
     pub fn read_key(&self, name: &str) -> Result<Zeroizing<Vec<u8>>> {
         let path = self.key_path(name)?;
         let bytes = Zeroizing::new(
@@ -477,6 +490,34 @@ mod tests {
         })();
 
         result.expect("delete key");
+    }
+
+    #[test]
+    fn key_name_for_id_finds_alias_and_rejects_duplicates() {
+        let temp = TempDir::new().expect("tempdir");
+        let status = Command::new("git")
+            .arg("init")
+            .current_dir(temp.path())
+            .status()
+            .expect("git init");
+        assert!(status.success());
+
+        let result = (|| {
+            let store = KeyStore::discover_from(temp.path())?;
+            store.store_key("default", &[8_u8; 32])?;
+            let key_id = key_id_for_key(&[8_u8; 32]);
+            assert_eq!(store.key_name_for_id(&key_id)?, Some("default".to_owned()));
+            assert_eq!(store.key_name_for_id(&key_id_for_key(&[9_u8; 32]))?, None);
+
+            let duplicate = fs::read(store.key_path("default")?)?;
+            fs::write(store.key_path("duplicate")?, duplicate)?;
+            store
+                .key_name_for_id(&key_id)
+                .expect_err("duplicate aliases should fail");
+            Ok::<_, crate::error::Error>(())
+        })();
+
+        result.expect("key alias lookup");
     }
 
     #[test]

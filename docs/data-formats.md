@@ -53,7 +53,9 @@ manifest is read. Key names may contain only ASCII letters, digits, `_`, and
 For a filtered path, `git-zcrypt` uses the nearest `git-zcrypt-keys.json` found
 by walking from the file's directory upward toward the repository root. A root
 manifest can be created with `git-zcrypt init-manifest`; subdirectory manifests
-can be created with `git-zcrypt init-manifest --path <dir>`.
+can be created with `git-zcrypt init-manifest --path <dir>`. Existing encrypted
+blobs carry the key-id metadata needed for `git-zcrypt register <file>...` to
+populate the selected manifest when the matching local key alias is available.
 
 ## Local Key File Format
 
