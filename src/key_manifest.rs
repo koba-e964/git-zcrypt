@@ -24,6 +24,13 @@ pub struct ResolvedWorktreeFile {
     pub repo_path: PathBuf,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Authorization {
+    Allowed,
+    MissingManifest,
+    KeyNotDeclared,
+}
+
 pub fn init_manifest(path: &Path) -> Result<PathBuf> {
     let root = worktree_root()?;
     let dir = resolve_dir(&root, path)?;
@@ -47,17 +54,18 @@ pub fn add_key_for_path(path: &Path, key_id: &str, key_name: &str) -> Result<Pat
     Ok(manifest)
 }
 
-pub fn key_allowed_for_path(path: &Path, key_id: &str) -> Result<bool> {
+pub fn authorize_key_for_path(path: &Path, key_id: &str) -> Result<Authorization> {
     key_store::validate_key_id(key_id)?;
     let root = worktree_root()?;
-    let manifest = find_manifest_path(&root, path)?.with_context(|| {
-        format!(
-            "no {MANIFEST_FILE} found for {}; run git-zcrypt init-manifest",
-            path.display()
-        )
-    })?;
+    let Some(manifest) = find_manifest_path(&root, path)? else {
+        return Ok(Authorization::MissingManifest);
+    };
     let keys = read_manifest(&manifest)?;
-    Ok(keys.contains_key(key_id))
+    if keys.contains_key(key_id) {
+        Ok(Authorization::Allowed)
+    } else {
+        Ok(Authorization::KeyNotDeclared)
+    }
 }
 
 pub fn resolve_worktree_file(path: &Path) -> Result<ResolvedWorktreeFile> {

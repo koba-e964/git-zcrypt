@@ -600,7 +600,7 @@ fn clone_without_local_key_checks_out_encrypted_blob_and_restore_resmudges() {
 }
 
 #[test]
-fn smudge_fails_when_manifest_is_missing() {
+fn smudge_passes_through_when_manifest_is_missing() {
     let repo = init_repo();
     let clean = filter(
         &repo,
@@ -619,7 +619,12 @@ fn smudge_fails_when_manifest_is_missing() {
         &["smudge", "--path", "secrets/secret.txt"],
         &clean.stdout,
     );
-    assert!(!smudge.status.success());
+    assert!(
+        smudge.status.success(),
+        "{}",
+        String::from_utf8_lossy(&smudge.stderr)
+    );
+    assert_eq!(smudge.stdout, clean.stdout);
     assert!(String::from_utf8_lossy(&smudge.stderr).contains("no git-zcrypt-keys.json found"));
 }
 

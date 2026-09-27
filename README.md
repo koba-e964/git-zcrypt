@@ -192,6 +192,13 @@ importing or deriving the missing key, re-smudge a file with:
 git restore --source=HEAD --worktree -- secrets/secret.txt
 ```
 
+If no manifest exists yet—for example while `git rebase --autosquash` applies a
+fixup that adds `.gitattributes` and an encrypted file—smudge also preserves the
+encrypted bytes and succeeds with a warning. A present manifest that omits the
+blob's key id is still an error; this keeps the manifest as the decryption
+authorization boundary while allowing historical commits to be replayed in the
+right order.
+
 Back keys up and transfer them securely. Losing or deleting the only copy of a
 key makes encrypted blobs that use it unrecoverable.
 
