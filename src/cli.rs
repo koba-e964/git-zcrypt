@@ -13,15 +13,42 @@ pub(crate) struct Cli {
 pub(crate) enum Command {
     Help,
     Init,
-    GenerateKey { key: String },
-    ImportKey { key: String, input: PathBuf },
-    DeriveKey { key: String, stdin: bool },
-    ExportKey { key: String, output: PathBuf },
-    DeleteKey { key: String },
-    InstallFilter { key: String },
+    InitManifest {
+        path: PathBuf,
+    },
+    GenerateKey {
+        key: String,
+    },
+    ImportKey {
+        key: String,
+        input: PathBuf,
+    },
+    DeriveKey {
+        key: String,
+        stdin: bool,
+    },
+    ExportKey {
+        key: String,
+        output: PathBuf,
+    },
+    DeleteKey {
+        key: String,
+    },
+    InstallFilter {
+        key: String,
+    },
     Status,
-    Clean { key: String },
-    Smudge,
+    Clean {
+        key: String,
+        path: PathBuf,
+    },
+    Smudge {
+        path: PathBuf,
+    },
+    Register {
+        manifest_dir: Option<PathBuf>,
+        paths: Vec<PathBuf>,
+    },
 }
 
 impl Cli {
@@ -47,6 +74,9 @@ impl Cli {
                 args.expect_empty("init")?;
                 Command::Init
             }
+            "init-manifest" => Command::InitManifest {
+                path: parse_optional_path("init-manifest", &mut args)?,
+            },
             "generate-key" => Command::GenerateKey {
                 key: parse_key_only("generate-key", &mut args, true)?,
             },
@@ -72,12 +102,19 @@ impl Cli {
                 args.expect_empty("status")?;
                 Command::Status
             }
-            "clean" => Command::Clean {
-                key: parse_key_only("clean", &mut args, false)?,
+            "clean" => {
+                let (key, path) = parse_key_and_path("clean", &mut args, "--path")?;
+                Command::Clean { key, path }
+            }
+            "smudge" => Command::Smudge {
+                path: parse_required_path("smudge", &mut args, "--path")?,
             },
-            "smudge" => {
-                args.expect_empty("smudge")?;
-                Command::Smudge
+            "register" => {
+                let (manifest_dir, paths) = parse_register("register", &mut args)?;
+                Command::Register {
+                    manifest_dir,
+                    paths,
+                }
             }
             _ => bail!("unknown command '{command}'\n\n{}", usage()),
         };
@@ -179,6 +216,70 @@ fn parse_key_and_path(
     Ok((key, path))
 }
 
+fn parse_optional_path(command: &str, args: &mut Args) -> Result<PathBuf> {
+    let mut path = None;
+    while let Some(arg) = args.next() {
+        let (option, inline_value) = parse_option(command, arg)?;
+        if option == "--path" {
+            set_once(
+                command,
+                option,
+                &mut path,
+                PathBuf::from(option_value(command, option, inline_value, args)?),
+            )?;
+        } else {
+            bail!("{command}: unexpected option '{option}'");
+        }
+    }
+    Ok(path.unwrap_or_else(|| PathBuf::from(".")))
+}
+
+fn parse_required_path(
+    command: &str,
+    args: &mut Args,
+    path_option: &'static str,
+) -> Result<PathBuf> {
+    let mut path = None;
+    while let Some(arg) = args.next() {
+        let (option, inline_value) = parse_option(command, arg)?;
+        if option == path_option {
+            set_once(
+                command,
+                option,
+                &mut path,
+                PathBuf::from(option_value(command, option, inline_value, args)?),
+            )?;
+        } else {
+            bail!("{command}: unexpected option '{option}'");
+        }
+    }
+    path.context(format!("{command}: missing {path_option}"))
+}
+
+fn parse_register(command: &str, args: &mut Args) -> Result<(Option<PathBuf>, Vec<PathBuf>)> {
+    let mut manifest_dir = None;
+    let mut paths = Vec::new();
+    while let Some(arg) = args.next() {
+        if arg.to_string_lossy().starts_with("--") {
+            let (option, inline_value) = parse_option(command, arg)?;
+            if option == "--manifest-dir" {
+                set_once(
+                    command,
+                    option,
+                    &mut manifest_dir,
+                    PathBuf::from(option_value(command, option, inline_value, args)?),
+                )?;
+            } else {
+                bail!("{command}: unexpected option '{option}'");
+            }
+        } else {
+            paths.push(PathBuf::from(arg));
+        }
+    }
+    ensure!(!paths.is_empty(), "{command}: missing <file>");
+    Ok((manifest_dir, paths))
+}
+
 fn parse_derive_key(args: &mut Args) -> Result<(String, bool)> {
     let command = "derive-key";
     let mut key = None;
@@ -223,6 +324,8 @@ fn parse_option(command: &str, arg: OsString) -> Result<(&'static str, Option<Os
         "--input" => "--input",
         "--output" => "--output",
         "--stdin" => "--stdin",
+        "--path" => "--path",
+        "--manifest-dir" => "--manifest-dir",
         _ => bail!("{command}: unknown option '{name}'"),
     };
     Ok((option, value))
@@ -264,6 +367,7 @@ fn set_once<T>(command: &str, option: &str, target: &mut Option<T>, value: T) ->
 pub(crate) fn usage() -> &'static str {
     "Usage:
   git-zcrypt init
+  git-zcrypt init-manifest [--path <dir>]
   git-zcrypt generate-key --key <name>
   git-zcrypt import-key --key <name> --input <path>
   git-zcrypt derive-key --key <name> [--stdin]
@@ -271,8 +375,9 @@ pub(crate) fn usage() -> &'static str {
   git-zcrypt delete-key --key <name>
   git-zcrypt install-filter --key <name>
   git-zcrypt status
-  git-zcrypt clean --key <name>
-  git-zcrypt smudge"
+  git-zcrypt clean --key <name> --path <path>
+  git-zcrypt smudge --path <path>
+  git-zcrypt register [--manifest-dir <dir>] <file>..."
 }
 
 #[cfg(test)]
@@ -283,6 +388,8 @@ mod tests {
     fn parses_planned_subcommands() {
         for args in [
             vec!["git-zcrypt", "init"],
+            vec!["git-zcrypt", "init-manifest"],
+            vec!["git-zcrypt", "init-manifest", "--path", "secrets/team-a"],
             vec!["git-zcrypt", "generate-key", "--key", "default"],
             vec![
                 "git-zcrypt",
@@ -305,8 +412,24 @@ mod tests {
             vec!["git-zcrypt", "delete-key", "--key", "default"],
             vec!["git-zcrypt", "install-filter", "--key", "default"],
             vec!["git-zcrypt", "status"],
-            vec!["git-zcrypt", "clean", "--key", "default"],
-            vec!["git-zcrypt", "smudge"],
+            vec![
+                "git-zcrypt",
+                "clean",
+                "--key",
+                "default",
+                "--path",
+                "secrets/a.txt",
+            ],
+            vec!["git-zcrypt", "smudge", "--path", "secrets/a.txt"],
+            vec!["git-zcrypt", "register", "secrets/a.txt"],
+            vec!["git-zcrypt", "register", "secrets/a.txt", "secrets/b.txt"],
+            vec![
+                "git-zcrypt",
+                "register",
+                "--manifest-dir",
+                "secrets",
+                "secrets/a.txt",
+            ],
         ] {
             Cli::try_parse_from(args).expect("subcommand should parse");
         }
@@ -336,7 +459,14 @@ mod tests {
             ],
             vec!["git-zcrypt", "delete-key", "--key", "default"],
             vec!["git-zcrypt", "install-filter", "--key", "default"],
-            vec!["git-zcrypt", "clean", "--key", "default"],
+            vec![
+                "git-zcrypt",
+                "clean",
+                "--key",
+                "default",
+                "--path",
+                "secrets/a.txt",
+            ],
         ] {
             Cli::try_parse_from(args).expect("--key should parse");
         }
