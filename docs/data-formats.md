@@ -57,6 +57,17 @@ can be created with `git-zcrypt init-manifest --path <dir>`. Existing encrypted
 blobs carry the key-id metadata needed for `git-zcrypt register <file>...` to
 populate the selected manifest when the matching local key alias is available.
 
+If no manifest exists while Git is reconstructing a historical tree, smudge
+passes the validated encrypted blob through unchanged and exits successfully.
+This is important for `git rebase --autosquash`: a fixup commit can introduce
+`.gitattributes` and an encrypted file before the commit that creates the
+manifest is applied. Passing ciphertext preserves the secret and lets rebase
+finish; a later checkout after the manifest is present can decrypt it normally.
+A manifest that exists but does not declare the blob key remains an error, so
+the manifest continues to authorize which keys may decrypt a path. This
+distinction keeps the rebase recovery narrow instead of making all filter
+failures non-fatal.
+
 ## Local Key File Format
 
 Each local key file is a versioned binary wrapper around raw key material:

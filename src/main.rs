@@ -87,12 +87,22 @@ fn smudge(path: &Path) -> Result<()> {
     let store = key_store::KeyStore::discover()?;
     let input = read_stdin()?;
     let encrypted = blob::decode(&input)?;
-    if !key_manifest::key_allowed_for_path(path, &encrypted.key_id)? {
-        crate::bail!(
-            "key {} is not declared for {}",
-            encrypted.key_id,
-            path.display()
-        );
+    match key_manifest::authorize_key_for_path(path, &encrypted.key_id)? {
+        key_manifest::Authorization::Allowed => {}
+        key_manifest::Authorization::KeyNotDeclared => {
+            crate::bail!(
+                "key {} is not declared for {}",
+                encrypted.key_id,
+                path.display()
+            );
+        }
+        key_manifest::Authorization::MissingManifest => {
+            eprintln!(
+                "warning: no git-zcrypt-keys.json found for {}; leaving encrypted bytes unchanged",
+                path.display()
+            );
+            return write_stdout(&input);
+        }
     }
     let Some(key) = store.try_read_key_by_id(&encrypted.key_id)? else {
         eprintln!(
