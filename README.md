@@ -1,5 +1,8 @@
 # git-zcrypt
 
+[![Crates.io](https://img.shields.io/crates/v/git-zcrypt.svg)](https://crates.io/crates/git-zcrypt)
+[![Documentation](https://docs.rs/git-zcrypt/badge.svg)](https://docs.rs/git-zcrypt)
+
 `git-zcrypt` is a Git clean/smudge filter that compresses file bytes with zlib
 and encrypts them with ChaCha20-Poly1305 before Git stores them.
 
